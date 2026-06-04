@@ -1,0 +1,23 @@
+{
+  "idf.port": "/dev/ttyUSB0",
+  "C_Cpp.default.configurationProvider": "espressif.esp-idf-extension",
+  "C_Cpp.default.compileCommands": "${workspaceFolder}/build/compile_commands.json",
+  "C_Cpp.default.compilerPath": "/home/huyang/.espressif/tools/xtensa-esp-elf/esp-15.2.0_20251204/xtensa-esp-elf/bin/xtensa-esp32-elf-gcc",
+  "idf.flashType": "UART",
+  "idf.customExtraVars": {
+    "IDF_PATH": "/home/huyang/.espressif/v6.0.1/esp-idf",
+    "IDF_TOOLS_PATH": "/home/huyang/.espressif",
+    "IDF_PYTHON_ENV_PATH": "/home/huyang/.espressif/tools/python/v6.0.1/venv",
+    "ESP_IDF_VERSION": "6.0.1",
+    "ESP_ROM_ELF_DIR": "/home/huyang/.espressif/tools/esp-rom-elfs/20241011/",
+    "OPENOCD_SCRIPTS": "/home/huyang/.espressif/tools/openocd-esp32/v0.12.0-esp32-20260304/openocd-esp32/share/openocd/scripts",
+    "ESP_CLANG_LIBS_PATH": "/home/huyang/.espressif/tools/esp-clang-libs/esp-20.1.1_20250829/esp-clang/lib"
+  },
+  "clangd.path": "/home/huyang/.espressif/tools/esp-clang/esp-20.1.1_20250829/esp-clang/bin/clangd",
+  "clangd.arguments": [
+    "--background-index",
+    "--query-driver=**",
+    "--compile-commands-dir=/home/huyang/projects/esp32/build"
+  ],
+  "idf.currentSetup": "/home/huyang/.espressif/v6.0.1/esp-idf"
+}
