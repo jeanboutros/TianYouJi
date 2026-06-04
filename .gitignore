@@ -1,0 +1,9 @@
+# ESP-IDF build output
+build/
+
+# Generated sdkconfig backup
+sdkconfig.old
+
+# IDF diagnostic and log files
+idf-diag-*/
+log/
