@@ -48,32 +48,92 @@ enum class NrfTxPower : uint8_t {
 };
 
 /**
- * @brief Air data rate options for the nRF24L01+ RF_SETUP register.
+ * @brief Logic level of a single-bit RF_DR field (RF_DR_LOW or RF_DR_HIGH).
  *
- * Encoded across two non-adjacent bits — RF_DR_LOW (bit 5) and RF_DR_HIGH
- * (bit 3) — which this enum abstracts into a single clean choice.
+ * Used as the field type inside @ref NrfDataRateBits.
+ */
+enum class NrfDrBit : uint8_t {
+    Low  = 0, ///< Bit is 0
+    High = 1, ///< Bit is 1
+};
+
+/**
+ * @brief The two raw hardware bits that encode the air data rate.
+ *
+ * Returned by @ref to_bits(NrfDataRate). Mirrors the register layout
+ * exactly — RF_DR_LOW is bit 5 and RF_DR_HIGH is bit 3 of RF_SETUP.
  *
  * @code
- *   RF_DR_LOW  RF_DR_HIGH   Rate       Internal enum value
- *       0           0       1 Mbps     0b00  ← reset default
- *       0           1       2 Mbps     0b01
- *       1           0       250 kbps   0b10
- *       1           1       Reserved   (do not use)
+ *   RF_DR_LOW   RF_DR_HIGH   Rate
+ *   Low  (0)    Low  (0)     1 Mbps
+ *   Low  (0)    High (1)     2 Mbps
+ *   High (1)    Low  (0)     250 kbps
+ *   High (1)    High (1)     Reserved
  * @endcode
+ */
+struct NrfDataRateBits {
+    NrfDrBit dr_low;  ///< RF_DR_LOW  — bit 5 of RF_SETUP
+    NrfDrBit dr_high; ///< RF_DR_HIGH — bit 3 of RF_SETUP
+};
+
+/**
+ * @brief Air data rate options for the nRF24L01+ RF_SETUP register.
  *
- * The enum value encodes [RF_DR_LOW | RF_DR_HIGH] as a 2-bit number so
- * @ref RfSetup::to_byte() can split it back out with simple bit shifts.
+ * Abstracts the two non-adjacent hardware bits (RF_DR_LOW bit 5 and
+ * RF_DR_HIGH bit 3) into a single named choice.
+ *
+ * Use @ref to_bits() to decompose back into the individual hardware bits.
+ *
+ * @code
+ *   RF_DR_LOW  RF_DR_HIGH   Rate
+ *       0           0       1 Mbps   (reset default)
+ *       0           1       2 Mbps
+ *       1           0       250 kbps
+ *       1           1       Reserved — do not use
+ * @endcode
  *
  * Usage:
  * @code
- *   cfg.data_rate = NrfDataRate::Kbps250;  // best range, lowest throughput
- *   cfg.data_rate = NrfDataRate::Mbps2;    // highest throughput
+ *   cfg.data_rate = NrfDataRate::Kbps250;           // set rate
+ *   NrfDataRateBits b = to_bits(NrfDataRate::Mbps2); // decompose
+ *   // b.dr_low == NrfDrBit::Low, b.dr_high == NrfDrBit::High
  * @endcode
  */
 enum class NrfDataRate : uint8_t {
     Mbps1   = 0b00, ///< 1 Mbps   — RF_DR_LOW=0, RF_DR_HIGH=0 (reset default)
     Mbps2   = 0b01, ///< 2 Mbps   — RF_DR_LOW=0, RF_DR_HIGH=1
     Kbps250 = 0b10, ///< 250 kbps — RF_DR_LOW=1, RF_DR_HIGH=0 (longest range)
+};
+
+/**
+ * @brief Decompose a @ref NrfDataRate into its two raw hardware bits.
+ *
+ * @code
+ *   to_bits(NrfDataRate::Mbps1)   → { dr_low: Low,  dr_high: Low  }
+ *   to_bits(NrfDataRate::Mbps2)   → { dr_low: Low,  dr_high: High }
+ *   to_bits(NrfDataRate::Kbps250) → { dr_low: High, dr_high: Low  }
+ * @endcode
+ *
+ * @param rate  The data rate to decompose.
+ * @return      @ref NrfDataRateBits with the corresponding RF_DR_LOW and RF_DR_HIGH values.
+ */
+constexpr NrfDataRateBits to_bits(NrfDataRate rate) {
+    const uint8_t v = static_cast<uint8_t>(rate);
+    return {
+        static_cast<NrfDrBit>((v >> 1) & 0x01), /* RF_DR_LOW  = upper bit */
+        static_cast<NrfDrBit>((v >> 0) & 0x01), /* RF_DR_HIGH = lower bit */
+    };
+}
+
+/**
+ * @brief Continuous carrier wave control for RF_SETUP bit 7.
+ *
+ * When @ref Enabled, the nRF24L01+ outputs an unmodulated centered carrier.
+ * See datasheet §RF_SETUP and the continuous carrier wave test procedure.
+ */
+enum class NrfContWave : uint8_t {
+    Disabled = 0, ///< Normal operation (reset default)
+    Enabled  = 1, ///< Output unmodulated carrier — bit 7 set
 };
 
 /**
@@ -104,8 +164,7 @@ struct RfSetup {
     NrfDataRate data_rate = NrfDataRate::Mbps1;   ///< Air data rate (bits 5 and 3)
     NrfTxPower  tx_power  = NrfTxPower::dBm0;     ///< TX output power (bits 2:1)
 
-    /** Enables continuous carrier transmit when high. (datasheet §RF_SETUP bit 7) */
-    bool cont_wave = false;
+    NrfContWave cont_wave = NrfContWave::Disabled; ///< Continuous carrier transmit — bit 7 (datasheet §RF_SETUP)
 
     /** Force PLL lock signal. Only used in test. (datasheet §RF_SETUP bit 4) */
     bool pll_lock  = false;
@@ -138,10 +197,10 @@ struct RfSetup {
      * @return Raw byte ready to write to register 0x06.
      */
     uint8_t to_byte() const {
-        const uint8_t dr   = static_cast<uint8_t>(data_rate);
-        const uint8_t dr_low  = (dr >> 1) & 0x01; /* upper bit of 2-bit encoding → bit 5 */
-        const uint8_t dr_high = (dr >> 0) & 0x01; /* lower bit of 2-bit encoding → bit 3 */
-        const uint8_t pwr  = static_cast<uint8_t>(tx_power);
+        const NrfDataRateBits dr_bits = to_bits(data_rate);
+        const uint8_t dr_low  = static_cast<uint8_t>(dr_bits.dr_low);
+        const uint8_t dr_high = static_cast<uint8_t>(dr_bits.dr_high);
+        const uint8_t pwr     = static_cast<uint8_t>(tx_power);
 
         return (static_cast<uint8_t>(cont_wave) << 7)
              | (dr_low                          << 5)
@@ -173,7 +232,7 @@ struct RfSetup {
         s.data_rate  = static_cast<NrfDataRate>((dr_low << 1) | dr_high);
         s.tx_power   = static_cast<NrfTxPower>((byte >> 1) & 0x03);
         s.pll_lock   = static_cast<bool>((byte >> 4) & 0x01);
-        s.cont_wave  = static_cast<bool>((byte >> 7) & 0x01);
+        s.cont_wave  = static_cast<NrfContWave>((byte >> 7) & 0x01);
         return s;
     }
 };
