@@ -84,6 +84,29 @@ Rules:
 - Reserved bits are represented as unnamed padding or a note in the Doxygen block — **never silently ignored** in `to_byte()` or `from_byte()`.
 - If a multi-bit field has a non-contiguous encoding (e.g. nRF24 `DataRate` spans bits 5 and 3), the encoding logic **must follow the datasheet's table exactly** — use a helper in `detail::` rather than inventing a compact representation.
 
+### Platform independence — libraries must not couple to a specific SDK
+
+- **No platform headers in library public API.** A reusable library (e.g. a peripheral driver) must not `#include` platform-specific headers (ESP-IDF, STM32 HAL, Arduino, etc.) in any public header under `include/`.
+- **Abstract hardware access through a HAL interface.** Define a pure-virtual `Hal` class in the library. Platform-specific implementations live **outside** the library (e.g. in `main/` or a platform adapter component).
+- **Library source files must only include library headers and standard C/C++ headers.**
+
+### Dogfood your own vocabulary — no raw integers in examples or docs
+
+When the library defines named constants or typed enums, **all documentation, `@code` examples, and internal usage must use them**:
+
+```cpp
+// BAD — raw hex in an @code block, even though nrf24::reg::CONFIG exists
+radio.write_reg(0x00, 0x03);
+
+// GOOD — uses the library's own vocabulary
+radio.write_reg(nrf24::reg::CONFIG, nrf24::Config().to_byte());
+```
+
+Rules:
+- **`@param` docs** must reference the header that defines the legal values (e.g. "Use constants from `nrf24l01plus/registers/addresses.h`").
+- **`@code` examples** must use the library's typed constants — never magic numbers that the user would need to look up.
+- **If a function accepts `uint8_t` but a named-constant vocabulary exists**, the documentation must make this explicit so users discover the constants at the call site, not by accident.
+
 ## Knowledge Management Rules
 
 ### Learning Summaries

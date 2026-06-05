@@ -19,8 +19,8 @@ namespace nrf24 {
  *   // Fixed command:
  *   hal.spi_xfer(cmd::FLUSH_RX, nullptr, nullptr, 0);
  *
- *   // Variable command (read register 0x07):
- *   hal.spi_xfer(nrf24::cmd_r_register(0x07), nullptr, &val, 1);
+ *   // Variable command (read STATUS register):
+ *   hal.spi_xfer(nrf24::cmd_r_register(nrf24::reg::STATUS), nullptr, &val, 1);
  * @endcode
  */
 namespace cmd {
@@ -89,7 +89,8 @@ constexpr uint8_t W_ACK_PAYLOAD_BASE = 0xA8;
 /**
  * @brief Compose an R_REGISTER command byte.
  *
- * @param addr  5-bit register address (0x00–0x1D).
+ * @param addr  5-bit register address.  Use constants from
+ *              nrf24l01plus/registers/addresses.h (e.g. nrf24::reg::STATUS).
  * @return      Command byte: 0b000A_AAAA.
  */
 constexpr uint8_t cmd_r_register(uint8_t addr)
@@ -100,7 +101,8 @@ constexpr uint8_t cmd_r_register(uint8_t addr)
 /**
  * @brief Compose a W_REGISTER command byte.
  *
- * @param addr  5-bit register address (0x00–0x1D).
+ * @param addr  5-bit register address.  Use constants from
+ *              nrf24l01plus/registers/addresses.h (e.g. nrf24::reg::CONFIG).
  * @return      Command byte: 0b001A_AAAA.
  */
 constexpr uint8_t cmd_w_register(uint8_t addr)
