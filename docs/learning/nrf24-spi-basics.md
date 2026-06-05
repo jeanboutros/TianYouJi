@@ -159,9 +159,52 @@ GND            ──────────  GND
 
 **Critical notes:**
 - NRF24L01+ is 3.3V ONLY — 5V will destroy it
-- Add 10µF + 100nF capacitor across VCC/GND close to the module
+- Add a **10µF electrolytic** + **100nF ceramic** capacitor across VCC/GND close to the module (see below)
 - Keep wires short (< 10 cm) for reliable 8 MHz SPI
 - CE and CSN are NOT part of the SPI bus — they are separate GPIO controls
+
+### Decoupling capacitors: what to buy and how to identify them
+
+Two capacitors in parallel right at the module's VCC/GND pins. They serve different jobs:
+
+| Cap | Type | Polarized? | Job |
+|---|---|---|---|
+| 10 µF | Aluminum electrolytic | **Yes** | Bulk charge reservoir — supplies sudden current when the module wakes up or switches mode |
+| 100 nF | Ceramic (MLCC) | **No** | High-frequency bypass — absorbs RF switching noise that the slow electrolytic can't handle |
+
+#### 10 µF electrolytic
+
+- **Shape**: small cylinder (like a tiny aluminium can), typically 5–6 mm tall, 2.5–3 mm diameter in through-hole form
+- **Body colour**: usually black sleeve with a light-coloured (white or grey) stripe down the **negative** side
+- **Legs**: longer leg = **positive (anode)**, shorter leg = **negative (cathode)**
+- **Marking on body**: `10µF 16V` or `10µF 25V` — pick a voltage rating ≥ 2× your supply, so 10 V or 16 V is fine for a 3.3 V rail
+- **Recommended type**: standard aluminium electrolytic, low-ESR preferred (look for "low ESR" or "general purpose"). Panasonic FR/FC series, Nichicon UHD — but any generic 10 µF 16 V through-hole electrolytic will work for this
+
+> ⚠️ Polarity matters. Reverse-biasing an electrolytic will damage or rupture it. VCC to the long (positive) leg, GND to the short (negative) leg.
+
+#### 100 nF ceramic
+
+- **Shape**: small disc (through-hole) or a tiny rectangular chip (SMD). Typically 4–5 mm across, usually yellow, orange, or light brown
+- **Legs**: both legs are the same length — **no polarity**
+- **Marking on body**: `104` — this is a 3-digit capacitance code meaning 10 × 10⁴ pF = 100,000 pF = 100 nF. You may also see `0.1` (µF) or `100n`
+- **Recommended type**: MLCC (Multi-Layer Ceramic Capacitor), **X7R or X5R dielectric** — these are stable across temperature. Avoid Y5V/Z5U which lose most of their capacitance under voltage
+- Any brand works — these are commodity parts
+
+#### How to place them
+
+```
+NRF24L01+ module
+     VCC ──┬──────────── 3.3V rail
+           │
+          [10µF]   ← electrolytic, + leg to VCC side
+           │
+          [100nF]  ← ceramic, either leg to either side
+           │
+     GND ──┴──────────── GND rail
+```
+
+Place both physically as close to the module's VCC/GND pins as possible. The ceramic does its job at high frequency only if the current loop is short.
+
 
 ### Optional: Multiple modules on one SPI bus
 
