@@ -12,6 +12,7 @@
 #include "freertos/task.h"
 #include "esp_system.h"
 #include "driver/gpio.h"
+#include "hal_espidf.h"
 #include <nrf24l01plus/driver.h>
 #include <nrf24l01plus/ble.h>
 #include <nrf24l01plus/registers.h>
@@ -61,7 +62,8 @@ static const struct
     {BLE_CH39_RFCH, 39, "ch39"},
 };
 
-static nrf24::Driver radio;
+static nrf24::EspIdfHal hal;
+static nrf24::Driver radio(hal);
 
 /* --- NRF24 BLE RX configuration ------------------------------------- */
 
@@ -229,7 +231,7 @@ static void ble_sniffer_task(void *arg)
 
 extern "C" void app_main(void)
 {
-    radio.init({
+    hal.init({
         .miso     = PIN_MISO,
         .mosi     = PIN_MOSI,
         .sclk     = PIN_SCLK,

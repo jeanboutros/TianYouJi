@@ -1,38 +1,21 @@
 #pragma once
 
 #include <cstdint>
-#include "driver/spi_master.h"
-#include "driver/gpio.h"
+#include "nrf24l01plus/hal.h"
 
 namespace nrf24 {
 
 /**
- * @brief Pin and SPI host configuration for the nRF24L01+ driver.
+ * @brief Platform-independent driver for the nRF24L01+ transceiver.
  *
- * All fields must be set before passing to Driver::init().
- */
-struct PinConfig {
-    gpio_num_t miso;       ///< SPI MISO pin
-    gpio_num_t mosi;       ///< SPI MOSI pin
-    gpio_num_t sclk;       ///< SPI clock pin
-    gpio_num_t csn;        ///< Chip-select (active low)
-    gpio_num_t ce;         ///< Chip-enable (RX/TX activation)
-    spi_host_device_t spi_host;  ///< ESP-IDF SPI host (e.g. SPI3_HOST)
-};
-
-/**
- * @brief Hardware driver for the nRF24L01+ transceiver.
- *
- * Manages SPI communication and CE pin control.  One instance per
- * physical radio module.  Call init() once before any other method.
+ * All hardware access is delegated to a Hal implementation supplied at
+ * construction.  This class encodes the nRF24L01+ SPI command protocol
+ * and provides a convenient register/payload API.
  *
  * @code
- *   nrf24::Driver radio;
- *   radio.init({
- *       .miso = GPIO_NUM_19, .mosi = GPIO_NUM_23, .sclk = GPIO_NUM_18,
- *       .csn  = GPIO_NUM_17, .ce   = GPIO_NUM_5,
- *       .spi_host = SPI3_HOST
- *   });
+ *   EspIdfHal hal;
+ *   hal.init(pins);
+ *   nrf24::Driver radio(hal);
  *   radio.write_reg(0x00, 0x03);   // CONFIG: PWR_UP + PRIM_RX
  *   radio.ce_high();                // Enter RX mode
  * @endcode
@@ -40,14 +23,12 @@ struct PinConfig {
 class Driver {
 public:
     /**
-     * @brief Initialise the SPI bus, add the nRF24 device, and configure CE.
+     * @brief Construct the driver with a HAL implementation.
      *
-     * Sets SPI mode 0, 8 MHz clock, 8-bit command phase.  CE pin is
-     * driven low after initialisation (standby-I mode).
-     *
-     * @param pins  Pin assignment and SPI host selection.
+     * @param hal  Reference to a platform-specific Hal.  Must outlive
+     *             this Driver instance.
      */
-    void init(const PinConfig &pins);
+    explicit Driver(Hal &hal) : hal_(hal) {}
 
     /**
      * @brief Read a single-byte register.
@@ -57,7 +38,7 @@ public:
      *
      * @code
      *   cmd byte: 0b000A_AAAA   (A = reg address)
-     *   nrf24_read_reg(0x07) → cmd = 0x07, reads STATUS
+     *   read_reg(0x07) -> cmd = 0x07, reads STATUS
      * @endcode
      *
      * @param reg  Register address (only bits [4:0] used).
@@ -73,7 +54,7 @@ public:
      *
      * @code
      *   cmd byte: 0b001A_AAAA   (A = reg address)
-     *   nrf24_write_reg(0x00, 0x03) → cmd = 0x20, writes CONFIG
+     *   write_reg(0x00, 0x03) -> cmd = 0x20, writes CONFIG
      * @endcode
      *
      * @param reg    Register address (only bits [4:0] used).
@@ -88,7 +69,7 @@ public:
      *
      * @param reg   Register address (only bits [4:0] used).
      * @param data  Pointer to bytes to write (LSByte first per nRF24 convention).
-     * @param len   Number of bytes (1–5 for address registers).
+     * @param len   Number of bytes (1-5 for address registers).
      */
     void write_reg_multi(uint8_t reg, const uint8_t *data, uint8_t len);
 
@@ -99,7 +80,7 @@ public:
      * into `buf`.
      *
      * @param reg  Register address (only bits [4:0] used).
-     * @param buf  Destination buffer (must be ≥ len bytes).
+     * @param buf  Destination buffer (must be >= len bytes).
      * @param len  Number of bytes to read.
      */
     void read_reg_multi(uint8_t reg, uint8_t *buf, uint8_t len);
@@ -110,8 +91,8 @@ public:
      * Sends the R_RX_PAYLOAD command (0x61) and clocks out `len` bytes.
      * The payload is removed from the RX FIFO after reading.
      *
-     * @param buf  Destination buffer (must be ≥ len bytes).
-     * @param len  Number of payload bytes to read (1–32).
+     * @param buf  Destination buffer (must be >= len bytes).
+     * @param len  Number of payload bytes to read (1-32).
      */
     void read_payload(uint8_t *buf, uint8_t len);
 
@@ -142,25 +123,14 @@ public:
     void ce_low();
 
     /**
-     * @brief Get the CE pin number.
+     * @brief Access the underlying HAL.
      *
-     * @return The GPIO number configured for CE.
+     * @return Reference to the Hal implementation passed at construction.
      */
-    gpio_num_t ce_pin() const { return ce_pin_; }
-
-    /**
-     * @brief Get the underlying SPI device handle.
-     *
-     * Useful for advanced/custom SPI transactions not covered by
-     * the convenience methods.
-     *
-     * @return The ESP-IDF SPI device handle.
-     */
-    spi_device_handle_t spi_handle() const { return spi_handle_; }
+    Hal &hal() { return hal_; }
 
 private:
-    spi_device_handle_t spi_handle_{};
-    gpio_num_t ce_pin_{};
+    Hal &hal_;
 };
 
 } // namespace nrf24
