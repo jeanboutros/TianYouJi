@@ -192,7 +192,7 @@ spi_bus_config_t bus_cfg = {
 ESP_ERROR_CHECK(spi_bus_initialize(NRF_SPI_HOST, &bus_cfg, SPI_DMA_DISABLED));
 ```
 
-**Why no DMA?** NRF24 transactions are small (max 33 bytes). DMA adds overhead for small transfers.
+**Why no DMA?** NRF24 transactions are small (max 33 bytes). DMA adds overhead for small transfers. See [What is DMA?](#what-is-dma) below.
 
 ### Step 2: Add the NRF24 device
 
@@ -256,6 +256,28 @@ void nrf24_ce_init(void) {
 void nrf24_ce_high(void) { gpio_set_level(PIN_CE, 1); }
 void nrf24_ce_low(void)  { gpio_set_level(PIN_CE, 0); }
 ```
+
+---
+
+## What is DMA?
+
+**DMA (Direct Memory Access)** is a hardware feature that lets peripherals transfer data directly to/from RAM without involving the CPU.
+
+**Without DMA (CPU-driven):**
+```
+SPI peripheral → CPU → RAM
+```
+The CPU reads each byte from the SPI register and writes it to memory. The CPU is busy/blocked for the entire transfer.
+
+**With DMA:**
+```
+SPI peripheral → DMA controller → RAM
+```
+The DMA controller handles the copy autonomously. The CPU is free to do other work and gets an interrupt when the transfer completes.
+
+**Why NRF24 doesn't use DMA:** NRF24 transactions are at most 33 bytes (1 command byte + 32 payload bytes). Setting up a DMA transfer has fixed overhead — allocating descriptors, configuring the DMA engine — that outweighs the benefit for such tiny payloads. Letting the CPU handle it directly is faster.
+
+DMA becomes worthwhile for large transfers: sending hundreds of bytes to a display, streaming audio samples, writing blocks to flash storage, etc.
 
 ---
 

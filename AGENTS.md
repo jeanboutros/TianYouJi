@@ -14,6 +14,16 @@ After every conversation where something non-trivial is learned or solved:
 2. **Update `docs/learning/INDEX.md`** — add or update the entry for the relevant theme. Group entries by theme (e.g. *FreeRTOS*, *ESP-IDF Setup*, *C/C++ Basics*).
 3. All learning files must be **Markdown only**.
 
+### Follow-up Questions and Clarifications (MANDATORY)
+
+Whenever a follow-up question or clarification is asked about a topic that already has a learning document:
+
+1. **Add the answer directly into the relevant existing doc** — do not just reply in chat and move on.
+2. Place the new content in the most logical section, or add a new section if needed.
+3. Then commit the updated doc.
+
+> Rationale: the docs are the source of truth. A clarification that lives only in chat history is lost.
+
 ### Reference Policy (MANDATORY)
 
 - **Never rely solely on training data** for factual claims about APIs, versions, behaviour, or hardware specs.
