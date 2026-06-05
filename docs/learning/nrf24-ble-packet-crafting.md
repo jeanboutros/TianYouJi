@@ -356,7 +356,8 @@ This is a **proof-of-concept** — the ESP32's real BLE stack (from the previous
 
 ## References
 
-- [NRF24L01+ Product Specification v1.0 (Nordic Semiconductor)](https://docs.nordicsemi.com/r/bundle/pdf_ps_nrf24l01p/page/pdf/nrf24/nrf24l01p_ps_1.0/ps_nrf24l01p.html) — Chapter 7: Data and Control Interface *(verified 2026-06-05)*
+- NRF24L01+ Product Specification v1.0 (Nordic Semiconductor) — local copy: `docs/datasheets/nRF24L01P_PS_v1.0.pdf` — Chapter 7: Data and Control Interface
+- Online: [NRF24L01+ Product Specification v1.0](https://docs.nordicsemi.com/r/bundle/pdf_ps_nrf24l01p/page/pdf/nrf24/nrf24l01p_ps_1.0/ps_nrf24l01p.html) *(verified 2026-06-05)*
 - [Bluetooth Core Specification v5.x](https://www.bluetooth.com/specifications/specs/core-specification/) — Vol 6, Part B, Section 2.3 (Advertising Channel PDU)
 - [Dmitry Grinberg: "Bit-banging Bluetooth Low Energy"](http://dmitry.gr/index.php?r=05.Projects&proj=11.%20Bluetooth%20LE%20fakery) — Original research on BLE-from-NRF24
 - [ESP-IDF SPI Master Driver](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/peripherals/spi_master.html) *(verified 2026-06-04)*

@@ -269,7 +269,7 @@ void nrf24_ce_low(void)  { gpio_set_level(PIN_CE, 0); }
 
 | Document | What it is | Contains NRF24L01+ SPI commands? |
 |---|---|---|
-| *NRF24L01+ Product Specification v1.0* (Nordic Semiconductor) | The official chip specification. Defines every register, SPI command, RF parameter, timing. | ✅ Yes — this is the primary source |
+| `docs/datasheets/nRF24L01P_PS_v1.0.pdf` | The official Nordic Semiconductor chip specification. Defines every register, SPI command, RF parameter, timing. 6633 lines, text-extracted and verified. | ✅ Yes — this is the primary source |
 | `docs/datasheets/az087_c_20.pdf` | AZ-Delivery **ESP32 Dev Kit C V4** user guide (text-extracted and verified) | ❌ No — this is an ESP32 board guide, not a NRF24L01+ chip spec |
 
 ### Why the local PDF is not the NRF24L01+ spec
@@ -378,5 +378,6 @@ idf_component_register(
 ## References
 
 - [ESP-IDF SPI Master Driver](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/peripherals/spi_master.html) *(verified 2026-06-04)*
-- [NRF24L01+ Product Specification v1.0 (Nordic Semiconductor)](https://docs.nordicsemi.com/r/bundle/pdf_ps_nrf24l01p/page/pdf/nrf24/nrf24l01p_ps_1.0/ps_nrf24l01p.html) — Section 8: Register Map, Section 8.3: SPI Commands *(verified 2026-06-05)*
+- NRF24L01+ Product Specification v1.0 (Nordic Semiconductor) — local copy: `docs/datasheets/nRF24L01P_PS_v1.0.pdf` — Section 8: Register Map, Section 8.3.1: SPI Commands
+- Online: [NRF24L01+ Product Specification v1.0](https://docs.nordicsemi.com/r/bundle/pdf_ps_nrf24l01p/page/pdf/nrf24/nrf24l01p_ps_1.0/ps_nrf24l01p.html) *(verified 2026-06-05)*
 - ⚠️ Note: `docs/datasheets/az087_c_20.pdf` is the AZ-Delivery ESP32 Dev Kit C V4 user guide — it is **not** the NRF24L01+ datasheet
