@@ -15,8 +15,8 @@ namespace nrf24 {
  * Data rate is encoded across two non-adjacent bits:
  *
  *   RF_DR_LOW(5)  RF_DR_HIGH(3)   Rate
- *       0              0          1 Mbps   ← reset default
- *       0              1          2 Mbps
+ *       0              0          1 Mbps
+ *       0              1          2 Mbps   ← reset default
  *       1              0          250 kbps
  *       1              1          Reserved
  * ═══════════════════════════════════════════════════════════════════════════ */
@@ -87,8 +87,8 @@ struct DataRateBits {
  *
  * @code
  *   RF_DR_LOW  RF_DR_HIGH   Rate
- *       0           0       1 Mbps   (reset default)
- *       0           1       2 Mbps
+ *       0           0       1 Mbps
+ *       0           1       2 Mbps   (reset default)
  *       1           0       250 kbps
  *       1           1       Reserved — do not use
  * @endcode
@@ -100,8 +100,8 @@ struct DataRateBits {
  * @endcode
  */
 enum class DataRate : uint8_t {
-    Mbps1   = 0b00, ///< 1 Mbps   — RF_DR_LOW=0, RF_DR_HIGH=0 (reset default)
-    Mbps2   = 0b01, ///< 2 Mbps   — RF_DR_LOW=0, RF_DR_HIGH=1
+    Mbps1   = 0b00, ///< 1 Mbps   — RF_DR_LOW=0, RF_DR_HIGH=0
+    Mbps2   = 0b01, ///< 2 Mbps   — RF_DR_LOW=0, RF_DR_HIGH=1 (reset default)
     Kbps250 = 0b10, ///< 250 kbps — RF_DR_LOW=1, RF_DR_HIGH=0 (longest range)
 };
 
@@ -220,7 +220,7 @@ struct RfSetup {
     /* ── Constants ────────────────────────────────────────────────────── */
 
     static constexpr uint8_t ADDRESS     = 0x06; ///< Register address in the nRF24L01+ register map
-    static constexpr uint8_t RESET_VALUE = 0x0E; ///< Power-on reset value (1 Mbps, 0 dBm)
+    static constexpr uint8_t RESET_VALUE = 0x0E; ///< Power-on reset value (2 Mbps, 0 dBm)
 
     /* ── Public data members ──────────────────────────────────────────── */
 
