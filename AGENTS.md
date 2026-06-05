@@ -2,6 +2,33 @@
 
 > **Important:** After managing a new challenge in a conversation, update this AGENTS.md file with the solution.
 
+## Multi-Agent Validation Pipeline (MANDATORY)
+
+This project uses a 3-phase validation pipeline for all non-trivial changes. Full specification lives in `docs/pipeline/pipeline.md`. Agent roles defined in `docs/pipeline/agents.md`.
+
+### Pipeline Summary
+
+```
+Phase A: ARCHITECTURE  →  Phase B: BUILD (PAU Loop)  →  Phase C: VERIFY
+```
+
+### Key Rules
+
+1. **No-Assumption Protocol** — When encountering ambiguity about hardware, protocol, or design, HALT with `STATUS: BLOCKED` and ask. Never guess register values or bit layouts.
+2. **PAU Loop** — Plan the units → Apply one unit at a time → Validate (`idf.py build`) after each. Never implement everything at once.
+3. **Datasheet is source of truth** — Verify all hardware details against `docs/datasheets/` before coding. If unclear, check the web. If still unclear, HALT.
+4. **Quality Gate** — Before committing: build passes, Doxygen present, typed enums used, no magic numbers, AGENTS.md rules followed.
+5. **Incremental execution** — One logical unit → build → pass → next unit. Never skip validation.
+6. **Flag Protocol** — Non-blocking issues raised as structured flags for the PM to process.
+
+### Validation Command
+
+```bash
+source ~/.espressif/tools/activate_idf_v6.0.1.sh && idf.py build
+```
+
+Must exit 0 with zero warnings (`-Werror` is active) before any commit.
+
 ## Code Documentation Rules (MANDATORY)
 
 ### Doxygen-style comments for all new symbols
