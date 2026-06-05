@@ -4,12 +4,54 @@
 
 ## Multi-Agent Validation Pipeline (MANDATORY)
 
-This project uses a 3-phase validation pipeline for all non-trivial changes. Full specification lives in `docs/pipeline/pipeline.md`. Agent roles defined in `docs/pipeline/agents.md`.
+This project uses a 3-phase validation pipeline for all non-trivial changes.
+
+### Documentation & Configuration
+
+| Resource | Location |
+|----------|----------|
+| Pipeline spec | `docs/pipeline/pipeline.md` |
+| Agent roles (detailed) | `docs/pipeline/agents.md` |
+| OpenCode agents | `.opencode/agents/` |
+| OpenCode skills | `.opencode/skills/` |
+| Task tracker | `docs/pipeline/TODO.md` |
+
+### OpenCode Agents
+
+| Agent | Role | Phases |
+|-------|------|--------|
+| `agency-director` | Orchestrator — dispatch only, never executes | All |
+| `software-engineer` | Architecture, API, component boundaries | A, C |
+| `hardware-engineer` | Register models, datasheet fidelity, timing | A, C |
+| `wireless-expert` | RF protocol, BLE spec, channel/frequency mapping | A, C |
+| `security-reviewer` | Buffer safety, stack depth, secrets, DMA bounds | A, C |
+| `test-engineer` | Test strategy, static_assert, host-side unit tests | A, B, C |
+| `docs-writer` | Doxygen, learning docs, reference verification | A, C |
+| `code-architect` | Implementation via PAU loop | B |
+| `pm` | Task creation, flag processing (sole authority) | All |
+
+### OpenCode Skills
+
+| Skill | Purpose | Used by |
+|-------|---------|---------|
+| `assumption-trap` | HALT on ambiguity — never guess | All agents |
+| `pau-loop` | Plan-Apply-Validate cycle | Code Architect, Test Engineer |
+| `incremental-execution` | Unit-by-unit with build validation | Code Architect, Test Engineer |
+| `datasheet-verification` | Verify hardware against datasheets | HW Engineer, Wireless Expert, Code Architect |
+| `self-audit-checklist` | 10-point quality checklist for reviews | All reviewing agents |
+| `flag-protocol` | Raise issues for PM attention | All non-PM agents |
+| `systematic-debugging` | Root-cause before fix — no random edits | Code Architect |
+| `test-driven-development` | Red-green-refactor with static_assert | Test Engineer |
+| `verification-before-completion` | No claims without fresh build evidence | All agents |
+| `brainstorming` | Structured design before code — hard gate | All (Phase A) |
+| `grill-me` | Adversarial review (Dual-Model Challenge) | Phase A & C |
 
 ### Pipeline Summary
 
 ```
-Phase A: ARCHITECTURE  →  Phase B: BUILD (PAU Loop)  →  Phase C: VERIFY
+Phase A: REQUIREMENTS & DESIGN  →  Phase B: BUILD (PAU Loop)  →  Phase C: MULTI-AGENT VERIFY
+   (All specialists review)          (Code Architect)              (All specialists approve)
+   (Dual-Model Challenge)                                          (Dual-Model Challenge)
 ```
 
 ### Key Rules

@@ -66,42 +66,61 @@ esp32/
 The pipeline has 3 phases. Each phase must complete before the next begins.
 
 ```
-┌──────────────────┐     ┌──────────────────┐     ┌──────────────────┐
-│  Phase A:        │     │  Phase B:        │     │  Phase C:        │
-│  ARCHITECTURE    │────▶│  BUILD (PAU)     │────▶│  VERIFY          │
-│                  │     │                  │     │                  │
-│  - Design review │     │  - Plan          │     │  - Quality gate  │
-│  - HW review     │     │  - Apply         │     │  - Self-audit    │
-│  - Security      │     │  - Validate      │     │  - Commit        │
-└──────────────────┘     └──────────────────┘     └──────────────────┘
+┌──────────────────────────┐     ┌──────────────────┐     ┌──────────────────────────┐
+│  Phase A:                │     │  Phase B:        │     │  Phase C:                │
+│  REQUIREMENTS & DESIGN   │────▶│  BUILD (PAU)     │────▶│  MULTI-AGENT VERIFY      │
+│                          │     │                  │     │                          │
+│  All specialists review  │     │  - Plan          │     │  All specialists approve │
+│  in parallel + challenge │     │  - Apply         │     │  + Dual-Model Challenge  │
+│  - SW Engineer           │     │  - Validate      │     │  - SW Engineer           │
+│  - HW Engineer           │     │                  │     │  - HW Engineer           │
+│  - Wireless Expert       │     │                  │     │  - Wireless Expert       │
+│  - Security Reviewer     │     │                  │     │  - Security Reviewer     │
+│  - Test Engineer         │     │                  │     │  - Test Engineer         │
+│  - Docs Writer           │     │                  │     │  - Docs Writer           │
+└──────────────────────────┘     └──────────────────┘     └──────────────────────────┘
 ```
 
 ---
 
-## Phase A — Architecture (Max 3 Loops)
+## Phase A — Requirements & Architecture (Max 3 Loops)
 
-**Goal:** Validate "What" and "How" before writing code.
+**Goal:** Define detailed requirements and validate "What" and "How" before writing code.
+All specialist agents participate in parallel. Both models review independently (Dual-Model Challenge).
 
-### A1: System Architecture Review
-- Validate component boundaries (portable library vs platform adapter)
-- Verify HAL interface sufficiency
-- Check register model completeness against datasheet
-- Confirm BLE protocol compliance with Core Spec
+### A0: Task Definition
+All agents collaborate to produce a detailed task specification:
+- **Acceptance criteria** (binary pass/fail)
+- **Files to create/modify**
+- **Constraints and risks**
+- **Test strategy**
+- **Documentation plan**
 
-### A2: Hardware Review
-- **Every register field** verified against the datasheet
-- Bit positions, encodings, and reset values checked
-- Non-contiguous field encodings explicitly handled
-- Reserved bits accounted for
+### A1: Parallel Specialist Review
 
-### A3: Security Review (Embedded Focus)
-- Buffer overflow risks (fixed-size payloads, SPI transfers)
-- Stack usage in tasks (FreeRTOS stack depth)
-- DMA boundary safety
-- No secrets in flash/logs
+All six specialists review the proposal **independently and in parallel**:
 
-### Gate
-If any reviewer finds an issue → loop back (max 3). After 3 iterations → escalate to user.
+| Agent | Focus |
+|-------|-------|
+| Software Engineer | Architecture, component boundaries, API design, code patterns |
+| Hardware Engineer | Register models, bit layouts, datasheet fidelity, timing constraints |
+| Wireless Expert | RF protocol compliance, BLE spec conformance, frequency/channel mapping, modulation |
+| Security Reviewer | Buffer safety, stack depth, secrets exposure, input validation |
+| Test Engineer | Testability, coverage gaps, edge cases, static_assert feasibility |
+| Docs Writer | Doxygen coverage plan, learning doc needs, reference validity |
+
+### A2: Dual-Model Challenge
+
+Two model passes review the architecture independently:
+1. **Primary pass** — produces the architecture proposal
+2. **Challenger pass** — critiques the primary, identifies gaps and contradictions
+
+The Agency Director synthesizes the strongest elements. If contradictions remain, the user decides.
+
+### A3: Gate
+- ALL six specialists must issue `APPROVED` or `CONDITIONAL PASS`
+- Any `REJECTED` → loop back with specific critique (max 3 loops)
+- After 3 iterations → escalate to user with all critiques
 
 ---
 
@@ -139,11 +158,42 @@ idf.py -p /dev/ttyUSB0 flash monitor
 
 ---
 
-## Phase C — Verify (Quality Gate)
+## Phase C — Verify (Multi-Agent Approval Gate)
 
-**Goal:** Final check before commit.
+**Goal:** Final check before commit. ALL specialist agents must approve.
 
-### Challenger Checklist
+### C1: Dual-Model Challenge (Verification)
+
+Two model passes review the implemented code independently:
+1. **Primary verifier** — checks against acceptance criteria and architecture
+2. **Challenger verifier** — adversarial review, tries to find what the primary missed
+
+### C2: Parallel Specialist Approval
+
+All six specialists review the final implementation **independently**:
+
+| Agent | Verification Focus |
+|-------|-------------------|
+| Software Engineer | Clean architecture, SOLID, typed enums, HAL decoupling, no raw integers |
+| Hardware Engineer | Register implementations match datasheet exactly, reserved bits handled |
+| Wireless Expert | RF parameters correct, BLE channel mapping verified, protocol timing valid |
+| Security Reviewer | No buffer overflows, stack safe, no secrets in code, input validated |
+| Test Engineer | Test coverage sufficient, edge cases covered, static_asserts pass |
+| Docs Writer | Doxygen complete on all new symbols, learning docs updated, refs valid |
+
+### C3: Approval Gate
+
+**ALL six specialists must approve.** Verdicts:
+- `APPROVED` — no issues found in this agent's domain
+- `CONDITIONAL PASS` — minor issues that don't block (raised as advisory flags)
+- `REJECTED` — blocking issue found (route feedback, max 3 loops)
+
+### Final Verdict
+- **ALL APPROVED** → Commit with conventional commit message
+- **ANY REJECTED** → Route feedback to Code Architect, fix, re-submit to rejecting agent(s) only (max 3 loops)
+- **3 loops exhausted** → Escalate to user with all findings
+
+### Challenger Checklist (applies to all reviewers)
 
 | # | Check | Criterion |
 |---|-------|-----------|
