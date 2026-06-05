@@ -1,4 +1,4 @@
-idf_component_register(SRCS "hello_world_main.cpp"
+idf_component_register(SRCS "main.cpp"
                        PRIV_REQUIRES spi_flash esp_driver_spi esp_driver_gpio nrf24l01plus
                        INCLUDE_DIRS "")
 
