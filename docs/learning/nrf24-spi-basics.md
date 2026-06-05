@@ -163,7 +163,52 @@ GND            ──────────  GND
 - Keep wires short (< 10 cm) for reliable 8 MHz SPI
 - CE and CSN are NOT part of the SPI bus — they are separate GPIO controls
 
----
+### Optional: Multiple modules on one SPI bus
+
+MOSI, MISO, and SCK are shared. Each module needs its own CSN and CE pin.
+
+```
+ESP32 (VSPI)              NRF24L01+ #1       NRF24L01+ #2       NRF24L01+ #3 ...
+─────────────             ────────────       ────────────       ────────────
+GPIO 18 (SCK)  ───────────  SCK        ────── SCK        ────── SCK
+GPIO 19 (MISO) ───────────  MISO       ────── MISO       ────── MISO
+GPIO 23 (MOSI) ───────────  MOSI       ────── MOSI       ────── MOSI
+GPIO 17        ───────────  CSN
+GPIO 5         ───────────  CE
+               GPIO 4  ──────────────── CSN
+               GPIO 16 ──────────────── CE
+               GPIO 2  ───────────────────────────────── CSN
+               GPIO 15 ───────────────────────────────── CE
+3V3 / GND      ───────────  VCC/GND   ────── VCC/GND   ────── VCC/GND
+```
+
+Rules:
+- Only one CSN may be LOW at a time — only that module responds to SPI traffic
+- CE is independent per module — you control which module is in TX/RX mode
+- Each module gets its own `spi_device_handle_t`; the ESP-IDF SPI driver handles CSN automatically
+- All modules share the same `spi_bus_initialize()` call; call `spi_bus_add_device()` once per module
+
+```c
+// One handle per module
+spi_device_handle_t nrf_handle[4];
+
+spi_device_interface_config_t dev_cfg = {
+    .clock_speed_hz = 8 * 1000 * 1000,
+    .mode = 0,
+    .queue_size = 1,
+    .command_bits = 8,
+    .address_bits = 0,
+};
+
+int csn_pins[] = {17, 4, 2, 14};
+
+for (int i = 0; i < 4; i++) {
+    dev_cfg.spics_io_num = csn_pins[i];
+    ESP_ERROR_CHECK(spi_bus_add_device(NRF_SPI_HOST, &dev_cfg, &nrf_handle[i]));
+}
+```
+
+
 
 ## 5. ESP-IDF SPI Master Driver Walkthrough
 
