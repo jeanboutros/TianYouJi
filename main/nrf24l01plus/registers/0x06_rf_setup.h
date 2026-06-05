@@ -194,6 +194,33 @@ constexpr uint8_t to_reg(ContWave v) {
 }
 
 /**
+ * @brief PLL lock control for RF_SETUP bit 4.
+ *
+ * Force PLL lock signal. Only used in test. (datasheet §RF_SETUP bit 4)
+ */
+enum class PllLock : uint8_t {
+    Disabled = 0, ///< Normal operation (reset default)
+    Enabled  = 1, ///< Force PLL lock — bit 4 set
+};
+
+/**
+ * @brief Return the RF_SETUP register contribution of a @ref PllLock value.
+ *
+ * Places the PLL_LOCK flag at bit 4.
+ *
+ * @code
+ *   to_reg(PllLock::Disabled) → 0b 0000 0000 = 0x00
+ *   to_reg(PllLock::Enabled)  → 0b 0001 0000 = 0x10
+ * @endcode
+ *
+ * @param v  Selected PLL lock setting.
+ * @return   Byte with PLL_LOCK at bit 4; all other bits zero.
+ */
+constexpr uint8_t to_reg(PllLock v) {
+    return static_cast<uint8_t>(v) << 4;
+}
+
+/**
  * @brief Typed, human-readable representation of the nRF24L01+ RF_SETUP
  *        register (address 0x06).
  *
@@ -222,9 +249,7 @@ struct RfSetup {
     TxPower  tx_power  = TxPower::dBm0;     ///< TX output power (bits 2:1)
 
     ContWave cont_wave = ContWave::Disabled; ///< Continuous carrier transmit — bit 7 (datasheet §RF_SETUP)
-
-    /** Force PLL lock signal. Only used in test. (datasheet §RF_SETUP bit 4) */
-    bool pll_lock  = false;
+    PllLock  pll_lock  = PllLock::Disabled;   ///< Force PLL lock signal, only used in test — bit 4 (datasheet §RF_SETUP)
 
     /* ── Methods ──────────────────────────────────────────────────────── */
 
@@ -265,7 +290,7 @@ struct RfSetup {
     uint8_t to_byte() const {
         return to_reg(cont_wave)
              | to_reg(data_rate)
-             | (static_cast<uint8_t>(pll_lock) << 4)
+             | to_reg(pll_lock)
              | to_reg(tx_power);
     }
 
@@ -291,7 +316,7 @@ struct RfSetup {
         const uint8_t dr_high = (byte >> 3) & 0x01;
         s.data_rate  = static_cast<DataRate>((dr_low << 1) | dr_high);
         s.tx_power   = static_cast<TxPower>((byte >> 1) & 0x03);
-        s.pll_lock   = static_cast<bool>((byte >> 4) & 0x01);
+        s.pll_lock   = static_cast<PllLock>((byte >> 4) & 0x01);
         s.cont_wave  = static_cast<ContWave>((byte >> 7) & 0x01);
         return s;
     }
