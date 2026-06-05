@@ -17,3 +17,6 @@
 
 ## BLE (ESP32 Bluetooth Stack)
 - [BLE advertising with ESP-IDF: GAP API, non-connectable beacons](ble-advertising-esp32.md)
+
+## C/C++ Basics
+- [enum class and struct: design patterns for embedded library types](cpp-enum-class-and-struct.md)
