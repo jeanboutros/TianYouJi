@@ -161,7 +161,9 @@ GND            ──────────  GND
 - NRF24L01+ is 3.3V ONLY — 5V will destroy it
 - Add a **10µF electrolytic** + **100nF ceramic** capacitor across VCC/GND close to the module (see below)
 - Keep wires short (< 10 cm) for reliable 8 MHz SPI
-- CE and CSN are NOT part of the SPI bus — they are separate GPIO controls
+- **CSN** (Chip Select Not) — active-low SPI gate. Pull LOW to let the module receive SPI traffic; HIGH means the module ignores the bus entirely. Equivalent to the standard SPI SS/CS pin. The ESP-IDF SPI driver toggles this automatically via `spics_io_num`.
+- **CE** (Chip Enable) — activates TX or RX mode. Pulse ≥ 10 µs HIGH to fire a TX packet; hold HIGH to stay in RX listening mode. Must be driven manually via GPIO — the SPI driver does not touch it.
+- Neither pin is MOSI/MISO/SCK, so they are wired as ordinary GPIOs, not as part of the SPI bus
 
 ### Decoupling capacitors: what to buy and how to identify them
 
