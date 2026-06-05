@@ -47,10 +47,67 @@ inline constexpr uint8_t ADV_ACCESS_ADDR[4] = {0x6B, 0x7D, 0x91, 0x71};
 
 /**
  * @brief Configuration for BLE passive RX mode.
+ *
+ * @code
+ *   // Scan only advertising channels, 50 ms each:
+ *   nrf24::ble::RxConfig cfg;
+ *   cfg.scan_duration_ms = 50;
+ *
+ *   // Scan advertising + some data channels:
+ *   uint8_t extra[] = {0, 1, 2, 12, 13};
+ *   cfg.extra_channels     = extra;
+ *   cfg.extra_channel_count = 5;
+ * @endcode
  */
 struct RxConfig {
-    uint8_t initial_channel_idx = 0; ///< Index into ADV_CHANNELS (0–2)
+    uint8_t initial_channel_idx = 0; ///< Index into ADV_CHANNELS (0–2) for initial tune
+
     uint8_t payload_width = 32;      ///< Fixed payload width (bytes, 1–32)
+
+    uint16_t scan_duration_ms = 50;  ///< Time to listen on each channel before rotating (ms)
+
+    /**
+     * @brief Optional additional BLE channel indices to scan (0–39).
+     *
+     * When non-null, the scanner cycles through the 3 advertising channels
+     * followed by these additional channels, spending scan_duration_ms on
+     * each.  If multiple radios are available, they can be assigned
+     * non-overlapping slices of this array for parallel reception.
+     *
+     * Ownership: caller must keep the array alive for the lifetime of
+     * the scanning loop.  Set to nullptr (default) to scan only the
+     * 3 advertising channels.
+     */
+    const uint8_t *extra_channels = nullptr;
+
+    uint8_t extra_channel_count = 0; ///< Number of entries in extra_channels (0 = adv only)
+
+    /**
+     * @brief Total number of channels in the scan sequence.
+     *
+     * Returns 3 (advertising) + extra_channel_count.
+     *
+     * @return Total channel count for one full scan cycle.
+     */
+    constexpr uint8_t total_channels() const
+    {
+        return static_cast<uint8_t>(3 + extra_channel_count);
+    }
+
+    /**
+     * @brief Get the BLE channel index for a given position in the scan sequence.
+     *
+     * Positions 0–2 map to the advertising channels (37, 38, 39).
+     * Positions 3+ map to entries in extra_channels[].
+     *
+     * @param seq_idx  Position in the scan sequence (0 to total_channels()-1).
+     * @return         BLE channel index (0–39).
+     */
+    constexpr uint8_t channel_at(uint8_t seq_idx) const
+    {
+        if (seq_idx < 3) return ADV_CHANNELS[seq_idx].ch_idx;
+        return extra_channels[seq_idx - 3];
+    }
 };
 
 /**
