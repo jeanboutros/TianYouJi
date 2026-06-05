@@ -2,6 +2,43 @@
 
 > **Important:** After managing a new challenge in a conversation, update this AGENTS.md file with the solution.
 
+## Code Documentation Rules (MANDATORY)
+
+### Doxygen-style comments for all new symbols
+
+Every new **function**, **struct**, **class**, **enum**, or **macro group** must be preceded by a Doxygen `/** ... */` block. Use the following structure:
+
+```c
+/**
+ * @brief One-sentence summary of what this does.
+ *
+ * Longer explanation if needed — describe the protocol, bit layout,
+ * algorithm, or non-obvious design decision here.
+ *
+ * Use @code / @endcode blocks for:
+ *   - Bit/byte layout diagrams
+ *   - Arithmetic walkthroughs
+ *   - Usage examples
+ *
+ * @code
+ *   // Example: show inputs, intermediate steps, and result
+ *   foo(REG_STATUS);   // 0x07 & 0x1F = 0x07 → cmd = 0x07
+ * @endcode
+ *
+ * @param name   Description (include units, valid range, or bit meaning).
+ * @return       What is returned and under what conditions.
+ */
+```
+
+### Rules
+
+- **`@brief`** — always present; one sentence, no period at end.
+- **`@code`** — use for any non-obvious bit manipulation, protocol encoding, or illustrative call site. Include an edge-case example (e.g. `0xFF` input) when the masking/clamping behaviour matters.
+- **`@param`** — one line per parameter; note which bits are used if the full width is not consumed.
+- **`@return`** — always present for non-void functions.
+- Comments inside the function body remain as `/* short inline notes */` — do **not** duplicate the Doxygen block content there.
+- This style applies to C and C++ equally.
+
 ## Knowledge Management Rules
 
 ### Learning Summaries
