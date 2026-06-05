@@ -50,6 +50,23 @@ enum class TxPower : uint8_t {
 };
 
 /**
+ * @brief Return the RF_SETUP register contribution of a @ref TxPower value.
+ *
+ * Shifts the 2-bit RF_PWR field into bits 2:1.
+ *
+ * @code
+ *   to_reg(TxPower::Minus18dBm) → 0b 0000 0000 = 0x00
+ *   to_reg(TxPower::dBm0)       → 0b 0000 0110 = 0x06
+ * @endcode
+ *
+ * @param v  Selected TX power level.
+ * @return   Byte with RF_PWR placed at bits 2:1; all other bits zero.
+ */
+constexpr uint8_t to_reg(TxPower v) {
+    return static_cast<uint8_t>(v) << 1;
+}
+
+/**
  * @brief Logic level of a single-bit RF_DR field (RF_DR_LOW or RF_DR_HIGH).
  *
  * Used as the field type inside @ref DataRateBits.
@@ -108,6 +125,27 @@ enum class DataRate : uint8_t {
 };
 
 /**
+ * @brief Return the RF_SETUP register contribution of a @ref DataRate value.
+ *
+ * Splits the rate into RF_DR_LOW (bit 5) and RF_DR_HIGH (bit 3) and places
+ * both in a single byte ready to OR into the register.
+ *
+ * @code
+ *   to_reg(DataRate::Mbps1)   → 0b 0000 0000 = 0x00  (both bits 0)
+ *   to_reg(DataRate::Mbps2)   → 0b 0000 1000 = 0x08  (bit 3 set)
+ *   to_reg(DataRate::Kbps250) → 0b 0010 0000 = 0x20  (bit 5 set)
+ * @endcode
+ *
+ * @param v  Selected data rate.
+ * @return   Byte with RF_DR_LOW at bit 5 and RF_DR_HIGH at bit 3; all other bits zero.
+ */
+constexpr uint8_t to_reg(DataRate v) {
+    const DataRateBits b = to_bits(v);
+    return (static_cast<uint8_t>(b.dr_low)  << 5)
+         | (static_cast<uint8_t>(b.dr_high) << 3);
+}
+
+/**
  * @brief Decompose a @ref NrfDataRate into its two raw hardware bits.
  *
  * @code
@@ -137,6 +175,23 @@ enum class ContWave : uint8_t {
     Disabled = 0, ///< Normal operation (reset default)
     Enabled  = 1, ///< Output unmodulated carrier — bit 7 set
 };
+
+/**
+ * @brief Return the RF_SETUP register contribution of a @ref ContWave value.
+ *
+ * Places the CONT_WAVE flag at bit 7.
+ *
+ * @code
+ *   to_reg(ContWave::Disabled) → 0b 0000 0000 = 0x00
+ *   to_reg(ContWave::Enabled)  → 0b 1000 0000 = 0x80
+ * @endcode
+ *
+ * @param v  Selected continuous wave setting.
+ * @return   Byte with CONT_WAVE at bit 7; all other bits zero.
+ */
+constexpr uint8_t to_reg(ContWave v) {
+    return static_cast<uint8_t>(v) << 7;
+}
 
 /**
  * @brief Typed, human-readable representation of the nRF24L01+ RF_SETUP
@@ -176,39 +231,42 @@ struct RfSetup {
     /**
      * @brief Serialise this configuration into the raw byte for RF_SETUP.
      *
-     * Bit packing performed here:
+     * Combines each field's register contribution using the @ref to_reg()
+     * overloads, then ORs them together:
+     *
      * @code
-     *   bit 7 ← cont_wave
+     *   bit 7 ← to_reg(cont_wave)
      *   bit 6 ← 0 (reserved)
-     *   bit 5 ← RF_DR_LOW  = upper bit of NrfDataRate value
+     *   bit 5 ← to_reg(data_rate) RF_DR_LOW
      *   bit 4 ← pll_lock
-     *   bit 3 ← RF_DR_HIGH = lower bit of NrfDataRate value
-     *   bits 2:1 ← tx_power (NrfTxPower value)
+     *   bit 3 ← to_reg(data_rate) RF_DR_HIGH
+     *   bits 2:1 ← to_reg(tx_power)
      *   bit 0 ← 0 (obsolete)
      * @endcode
      *
      * Examples:
      * @code
-     *   RfSetup().to_byte()
-     *   // Mbps1(0b00), dBm0(0b11) → 0b 0000 0110 = 0x06
+     *   nrf24::RfSetup().to_byte()
+     *   // DataRate::Mbps1, TxPower::dBm0 → 0b 0000 0110 = 0x06
      *
-     *   RfSetup{NrfDataRate::Kbps250, NrfTxPower::dBm0}.to_byte()
-     *   // DR_LOW=1(bit5), DR_HIGH=0(bit3), PWR=0b11(bits2:1) → 0b 0010 0110 = 0x26
+     *   nrf24::RfSetup{DataRate::Kbps250, TxPower::dBm0}.to_byte()
+     *   // RF_DR_LOW=1(bit5), RF_DR_HIGH=0(bit3), PWR=0b11(bits2:1) → 0b 0010 0110 = 0x26
+     * @endcode
+     *
+     * You can also compose the register value manually using to_reg():
+     * @code
+     *   uint8_t reg = nrf24::to_reg(nrf24::TxPower::dBm0)
+     *               | nrf24::to_reg(nrf24::DataRate::Kbps250)
+     *               | nrf24::to_reg(nrf24::ContWave::Disabled);
      * @endcode
      *
      * @return Raw byte ready to write to register 0x06.
      */
     uint8_t to_byte() const {
-        const DataRateBits dr_bits = to_bits(data_rate);
-        const uint8_t dr_low  = static_cast<uint8_t>(dr_bits.dr_low);
-        const uint8_t dr_high = static_cast<uint8_t>(dr_bits.dr_high);
-        const uint8_t pwr     = static_cast<uint8_t>(tx_power);
-
-        return (static_cast<uint8_t>(cont_wave) << 7)
-             | (dr_low                          << 5)
-             | (static_cast<uint8_t>(pll_lock)  << 4)
-             | (dr_high                         << 3)
-             | (pwr                             << 1);
+        return to_reg(cont_wave)
+             | to_reg(data_rate)
+             | (static_cast<uint8_t>(pll_lock) << 4)
+             | to_reg(tx_power);
     }
 
     /**
