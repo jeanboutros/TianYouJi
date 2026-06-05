@@ -66,42 +66,24 @@ constexpr uint8_t to_reg(TxPower v) {
     return static_cast<uint8_t>(v) << 1;
 }
 
-/**
- * @brief Logic level of a single-bit RF_DR field (RF_DR_LOW or RF_DR_HIGH).
- *
- * Used as the field type inside @ref DataRateBits.
- */
-enum class DrBit : uint8_t {
-    Low  = 0, ///< Bit is 0
-    High = 1, ///< Bit is 1
-};
+/** @cond INTERNAL — implementation details, not part of the public API. */
+namespace detail {
 
-/**
- * @brief The two raw hardware bits that encode the air data rate.
- *
- * Returned by @ref to_bits(DataRate). Mirrors the register layout
- * exactly — RF_DR_LOW is bit 5 and RF_DR_HIGH is bit 3 of RF_SETUP.
- *
- * @code
- *   RF_DR_LOW   RF_DR_HIGH   Rate
- *   Low  (0)    Low  (0)     1 Mbps
- *   Low  (0)    High (1)     2 Mbps
- *   High (1)    Low  (0)     250 kbps
- *   High (1)    High (1)     Reserved
- * @endcode
- */
+enum class DrBit : uint8_t { Low = 0, High = 1 };
+
 struct DataRateBits {
     DrBit dr_low;  ///< RF_DR_LOW  — bit 5 of RF_SETUP
     DrBit dr_high; ///< RF_DR_HIGH — bit 3 of RF_SETUP
 };
+
+} // namespace detail
+/** @endcond */
 
 /**
  * @brief Air data rate options for the nRF24L01+ RF_SETUP register.
  *
  * Abstracts the two non-adjacent hardware bits (RF_DR_LOW bit 5 and
  * RF_DR_HIGH bit 3) into a single named choice.
- *
- * Use @ref to_bits() to decompose back into the individual hardware bits.
  *
  * @code
  *   RF_DR_LOW  RF_DR_HIGH   Rate
@@ -113,9 +95,8 @@ struct DataRateBits {
  *
  * Usage:
  * @code
- *   cfg.data_rate = nrf24::DataRate::Kbps250;              // set rate
- *   nrf24::DataRateBits b = to_bits(nrf24::DataRate::Mbps2); // decompose
- *   // b.dr_low == nrf24::DrBit::Low, b.dr_high == nrf24::DrBit::High
+ *   cfg.data_rate = nrf24::DataRate::Kbps250;  // longest range
+ *   cfg.data_rate = nrf24::DataRate::Mbps2;    // highest throughput
  * @endcode
  */
 enum class DataRate : uint8_t {
@@ -123,6 +104,18 @@ enum class DataRate : uint8_t {
     Mbps2   = 0b01, ///< 2 Mbps   — RF_DR_LOW=0, RF_DR_HIGH=1
     Kbps250 = 0b10, ///< 250 kbps — RF_DR_LOW=1, RF_DR_HIGH=0 (longest range)
 };
+
+/** @cond INTERNAL */
+namespace detail {
+constexpr DataRateBits to_bits(DataRate rate) {
+    const uint8_t v = static_cast<uint8_t>(rate);
+    return {
+        static_cast<DrBit>((v >> 1) & 0x01), /* RF_DR_LOW  = upper bit */
+        static_cast<DrBit>((v >> 0) & 0x01), /* RF_DR_HIGH = lower bit */
+    };
+}
+} // namespace detail
+/** @endcond */
 
 /**
  * @brief Return the RF_SETUP register contribution of a @ref DataRate value.
@@ -140,29 +133,9 @@ enum class DataRate : uint8_t {
  * @return   Byte with RF_DR_LOW at bit 5 and RF_DR_HIGH at bit 3; all other bits zero.
  */
 constexpr uint8_t to_reg(DataRate v) {
-    const DataRateBits b = to_bits(v);
+    const detail::DataRateBits b = detail::to_bits(v);
     return (static_cast<uint8_t>(b.dr_low)  << 5)
          | (static_cast<uint8_t>(b.dr_high) << 3);
-}
-
-/**
- * @brief Decompose a @ref NrfDataRate into its two raw hardware bits.
- *
- * @code
- *   to_bits(nrf24::DataRate::Mbps1)   → { dr_low: Low,  dr_high: Low  }
- *   to_bits(nrf24::DataRate::Mbps2)   → { dr_low: Low,  dr_high: High }
- *   to_bits(nrf24::DataRate::Kbps250) → { dr_low: High, dr_high: Low  }
- * @endcode
- *
- * @param rate  The data rate to decompose.
- * @return      @ref DataRateBits with the corresponding RF_DR_LOW and RF_DR_HIGH values.
- */
-constexpr DataRateBits to_bits(DataRate rate) {
-    const uint8_t v = static_cast<uint8_t>(rate);
-    return {
-        static_cast<DrBit>((v >> 1) & 0x01), /* RF_DR_LOW  = upper bit */
-        static_cast<DrBit>((v >> 0) & 0x01), /* RF_DR_HIGH = lower bit */
-    };
 }
 
 /**
