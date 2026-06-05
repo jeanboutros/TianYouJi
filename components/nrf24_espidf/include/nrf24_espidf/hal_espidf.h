@@ -10,12 +10,12 @@ namespace nrf24 {
  * @brief ESP-IDF SPI/GPIO pin configuration for the nRF24L01+ HAL.
  */
 struct EspIdfPins {
-    gpio_num_t miso;
-    gpio_num_t mosi;
-    gpio_num_t sclk;
-    gpio_num_t csn;
-    gpio_num_t ce;
-    spi_host_device_t spi_host;
+    gpio_num_t miso;       ///< SPI MISO pin
+    gpio_num_t mosi;       ///< SPI MOSI pin
+    gpio_num_t sclk;       ///< SPI clock pin
+    gpio_num_t csn;        ///< Chip-select (active low)
+    gpio_num_t ce;         ///< Chip-enable (RX/TX activation)
+    spi_host_device_t spi_host;  ///< ESP-IDF SPI host (e.g. SPI3_HOST)
 };
 
 /**
@@ -45,7 +45,14 @@ public:
     void ce_low() override;
 
     /**
-     * @brief Get the CE pin number (for platform-specific use outside the lib).
+     * @brief Get the MOSI pin number (for platform-specific post-init control).
+     *
+     * @return The GPIO number configured for MOSI.
+     */
+    gpio_num_t mosi_pin() const { return mosi_pin_; }
+
+    /**
+     * @brief Get the CE pin number.
      *
      * @return The GPIO number configured for CE.
      */
@@ -61,6 +68,7 @@ public:
 private:
     spi_device_handle_t spi_handle_{};
     gpio_num_t ce_pin_{};
+    gpio_num_t mosi_pin_{};
 };
 
 } // namespace nrf24

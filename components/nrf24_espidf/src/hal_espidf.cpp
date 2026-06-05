@@ -1,4 +1,4 @@
-#include "hal_espidf.h"
+#include "nrf24_espidf/hal_espidf.h"
 #include "esp_check.h"
 #include <cstring>
 
@@ -6,7 +6,8 @@ namespace nrf24 {
 
 void EspIdfHal::init(const EspIdfPins &pins)
 {
-    ce_pin_ = pins.ce;
+    ce_pin_   = pins.ce;
+    mosi_pin_ = pins.mosi;
 
     /* SPI bus */
     spi_bus_config_t bus_cfg = {};
@@ -49,7 +50,6 @@ void EspIdfHal::spi_xfer(uint8_t cmd, const uint8_t *tx, uint8_t *rx, uint8_t le
     if (len == 0) {
         /* Command-only transaction (e.g. FLUSH_RX, FLUSH_TX) */
     } else if (tx && !rx) {
-        /* Write-only: use inline buffer for 1-4 bytes, heap for more */
         if (len <= 4) {
             t.flags = SPI_TRANS_USE_TXDATA;
             memcpy(t.tx_data, tx, len);
@@ -57,21 +57,18 @@ void EspIdfHal::spi_xfer(uint8_t cmd, const uint8_t *tx, uint8_t *rx, uint8_t le
             t.tx_buffer = tx;
         }
     } else if (!tx && rx) {
-        /* Read-only: use inline buffer for 1-4 bytes */
         if (len <= 4) {
             t.flags = SPI_TRANS_USE_RXDATA;
         } else {
             t.rx_buffer = rx;
         }
     } else if (tx && rx) {
-        /* Bidirectional — set both buffers */
         t.tx_buffer = tx;
         t.rx_buffer = rx;
     }
 
     ESP_ERROR_CHECK(spi_device_polling_transmit(spi_handle_, &t));
 
-    /* Copy back from inline rx buffer if used */
     if (rx && (t.flags & SPI_TRANS_USE_RXDATA) && len <= 4) {
         memcpy(rx, t.rx_data, len);
     }

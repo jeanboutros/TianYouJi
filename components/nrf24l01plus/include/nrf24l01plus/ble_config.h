@@ -1,0 +1,130 @@
+#pragma once
+
+#include <cstdint>
+#include "nrf24l01plus/driver.h"
+#include "nrf24l01plus/registers.h"
+
+namespace nrf24 {
+namespace ble {
+
+/**
+ * @brief BLE advertising channel descriptor.
+ *
+ * Maps a BLE channel index (37, 38, 39) to the nRF24L01+ RF_CH value.
+ * Frequency = 2400 + rf_ch MHz.
+ *
+ * @code
+ *   nrf24::ble::ADV_CHANNELS[0].rf_ch    // 2 → 2402 MHz (ch37)
+ *   nrf24::ble::ADV_CHANNELS[1].rf_ch    // 26 → 2426 MHz (ch38)
+ *   nrf24::ble::ADV_CHANNELS[2].rf_ch    // 80 → 2480 MHz (ch39)
+ * @endcode
+ */
+struct AdvChannel {
+    uint8_t rf_ch;       ///< nRF24L01+ RF_CH register value
+    uint8_t ch_idx;      ///< BLE channel index (37, 38, or 39)
+    const char *name;    ///< Human-readable label (e.g. "ch37")
+};
+
+/**
+ * @brief The three BLE advertising channels.
+ */
+inline constexpr AdvChannel ADV_CHANNELS[3] = {
+    { 2, 37, "ch37"},   ///< 2402 MHz
+    {26, 38, "ch38"},   ///< 2426 MHz
+    {80, 39, "ch39"},   ///< 2480 MHz
+};
+
+/**
+ * @brief BLE advertising access address (0x8E89BED6), bit-reversed per byte.
+ *
+ * BLE transmits LSbit-first; nRF24L01+ addresses are MSbit-first.
+ * Each byte is bit-mirrored:
+ * @code
+ *   0xD6 → 0x6B,  0xBE → 0x7D,  0x89 → 0x91,  0x8E → 0x71
+ * @endcode
+ */
+inline constexpr uint8_t ADV_ACCESS_ADDR[4] = {0x6B, 0x7D, 0x91, 0x71};
+
+/**
+ * @brief Configuration for BLE passive RX mode.
+ */
+struct RxConfig {
+    uint8_t initial_channel_idx = 0; ///< Index into ADV_CHANNELS (0–2)
+    uint8_t payload_width = 32;      ///< Fixed payload width (bytes, 1–32)
+};
+
+/**
+ * @brief Configure an nRF24L01+ for BLE passive reception.
+ *
+ * Programs all registers needed to receive raw BLE advertising frames:
+ * - Power up in PRX mode, CRC disabled (BLE has its own CRC)
+ * - Auto-ACK off, pipe 0 only, 4-byte address width
+ * - No retransmission, 1 Mbps data rate, 0 dBm TX power
+ * - Pipe 0 RX address set to BLE advertising access address
+ * - Specified RF channel from ADV_CHANNELS
+ *
+ * After calling, assert CE high to begin receiving.
+ *
+ * @code
+ *   nrf24::Driver radio(hal);
+ *   nrf24::ble::configure_rx(radio);
+ *   radio.ce_high();  // start listening
+ * @endcode
+ *
+ * @param radio   Driver instance (dependency injection).
+ * @param config  Optional RX configuration overrides.
+ */
+void configure_rx(Driver &radio, const RxConfig &config = {});
+
+/**
+ * @brief Clear all STATUS interrupt flags (RX_DR, TX_DS, MAX_RT).
+ *
+ * Writes 1 to bits 6:4 of STATUS to acknowledge and clear them.
+ *
+ * @param radio  Driver instance.
+ */
+inline void clear_irq_flags(Driver &radio)
+{
+    Status st;
+    st.rx_dr  = true;
+    st.tx_ds  = true;
+    st.max_rt = true;
+    radio.write_reg(reg::STATUS, st.to_byte());
+}
+
+/**
+ * @brief Switch to a different advertising channel.
+ *
+ * Lowers CE, reprograms RF_CH, clears IRQ flags, flushes RX FIFO,
+ * then reasserts CE.
+ *
+ * @param radio    Driver instance.
+ * @param ch_idx   Index into ADV_CHANNELS (0–2).
+ */
+inline void switch_channel(Driver &radio, uint8_t ch_idx)
+{
+    radio.ce_low();
+    RfCh rf_ch;
+    rf_ch.channel = ADV_CHANNELS[ch_idx].rf_ch;
+    radio.write_reg(reg::RF_CH, rf_ch.to_byte());
+    clear_irq_flags(radio);
+    radio.flush_rx();
+    radio.ce_high();
+}
+
+/**
+ * @brief Check if a new RX packet is available in the FIFO.
+ *
+ * Reads the STATUS register and checks the RX_DR flag.
+ *
+ * @param radio  Driver instance.
+ * @return       true if RX_DR is set (payload available).
+ */
+inline bool rx_available(Driver &radio)
+{
+    auto st = Status::from_byte(radio.read_reg(reg::STATUS));
+    return st.rx_dr;
+}
+
+} // namespace ble
+} // namespace nrf24
