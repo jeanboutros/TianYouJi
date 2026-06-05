@@ -200,29 +200,35 @@ constexpr uint8_t to_reg(PllLock v) {
  * Instead of remembering raw bit positions, configure the radio like this:
  *
  * @code
- *   nrf24::RfSetup cfg;                                    // defaults: 1 Mbps, 0 dBm
+ *   nrf24::RfSetup cfg;                                    // defaults: 2 Mbps, 0 dBm
  *   cfg.data_rate = nrf24::DataRate::Kbps250;              // change to 250 kbps
  *   cfg.tx_power  = nrf24::TxPower::Minus6dBm;            // reduce TX power
- *   nrf24_write_reg(REG_RF_SETUP, cfg.to_byte());          // → 0x24
+ *   nrf24_write_reg(nrf24::RfSetup::ADDRESS, cfg.to_byte());  // → 0x24
  * @endcode
  *
  * To verify what is currently programmed on the device:
  * @code
- *   nrf24::RfSetup actual = nrf24::RfSetup::from_byte(nrf24_read_reg(REG_RF_SETUP));
+ *   nrf24::RfSetup actual = nrf24::RfSetup::from_byte(
+ *       nrf24_read_reg(nrf24::RfSetup::ADDRESS));
  *   // inspect actual.data_rate, actual.tx_power, etc.
  * @endcode
  *
  * Default field values match the nRF24L01+ power-on reset state (0x0E):
- * 1 Mbps, 0 dBm, no continuous wave, no forced PLL lock.
+ * 2 Mbps, 0 dBm, no continuous wave, no forced PLL lock.
  */
 struct RfSetup {
+    /* ── Constants ────────────────────────────────────────────────────── */
+
+    static constexpr uint8_t ADDRESS     = 0x06; ///< Register address in the nRF24L01+ register map
+    static constexpr uint8_t RESET_VALUE = 0x0E; ///< Power-on reset value (1 Mbps, 0 dBm)
+
     /* ── Public data members ──────────────────────────────────────────── */
 
-    DataRate data_rate = DataRate::Mbps1;   ///< Air data rate (bits 5 and 3)
+    DataRate data_rate = DataRate::Mbps2;    ///< Air data rate (bits 5 and 3) — reset default: 2 Mbps
     TxPower  tx_power  = TxPower::dBm0;     ///< TX output power (bits 2:1)
 
     ContWave cont_wave = ContWave::Disabled; ///< Continuous carrier transmit — bit 7 (datasheet §RF_SETUP)
-    PllLock  pll_lock  = PllLock::Disabled;   ///< Force PLL lock signal, only used in test — bit 4 (datasheet §RF_SETUP)
+    PllLock  pll_lock  = PllLock::Disabled;  ///< Force PLL lock signal, only used in test — bit 4 (datasheet §RF_SETUP)
 
     /* ── Methods ──────────────────────────────────────────────────────── */
 
@@ -245,7 +251,7 @@ struct RfSetup {
      * Examples:
      * @code
      *   nrf24::RfSetup().to_byte()
-     *   // DataRate::Mbps1, TxPower::dBm0 → 0b 0000 0110 = 0x06
+     *   // DataRate::Mbps2, TxPower::dBm0 → 0b 0000 1110 = 0x0E
      *
      *   nrf24::RfSetup{DataRate::Kbps250, TxPower::dBm0}.to_byte()
      *   // RF_DR_LOW=1(bit5), RF_DR_HIGH=0(bit3), PWR=0b11(bits2:1) → 0b 0010 0110 = 0x26
@@ -275,9 +281,9 @@ struct RfSetup {
      *
      * @code
      *   RfSetup a;
-     *   a.data_rate = NrfDataRate::Kbps250;
+     *   a.data_rate = nrf24::DataRate::Kbps250;
      *   RfSetup b = RfSetup::from_byte(a.to_byte());
-     *   // b.data_rate == NrfDataRate::Kbps250  ✓
+     *   // b.data_rate == nrf24::DataRate::Kbps250  ✓
      * @endcode
      *
      * @param byte  Raw value read from register 0x06.

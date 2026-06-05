@@ -13,7 +13,7 @@
 #include "esp_system.h"
 #include "driver/spi_master.h"
 #include "driver/gpio.h"
-#include "nrf24l01plus/registers/0x06_rf_setup.h"
+#include <nrf24l01plus/registers.h>
 
 /* ─── Pin definitions ──────────────────────────────────────────────── */
 #define NRF_SPI_HOST SPI3_HOST
