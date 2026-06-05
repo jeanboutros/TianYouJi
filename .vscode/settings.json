@@ -19,5 +19,6 @@
     "--query-driver=**",
     "--compile-commands-dir=/home/huyang/projects/esp32/build"
   ],
-  "idf.currentSetup": "/home/huyang/.espressif/v6.0.1/esp-idf"
+  "idf.currentSetup": "/home/huyang/.espressif/v6.0.1/esp-idf",
+  "C_Cpp.intelliSenseEngine": "disabled"
 }
