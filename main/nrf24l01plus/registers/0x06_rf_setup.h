@@ -104,11 +104,11 @@ struct RfSetup {
     NrfDataRate data_rate = NrfDataRate::Mbps1;   ///< Air data rate (bits 5 and 3)
     NrfTxPower  tx_power  = NrfTxPower::dBm0;     ///< TX output power (bits 2:1)
 
-    /** Force PLL lock.  Reserved for factory testing — leave false. */
-    bool pll_lock  = false;
-
-    /** Continuous carrier wave.  Reserved for factory testing — leave false. */
+    /** Enables continuous carrier transmit when high. (datasheet §RF_SETUP bit 7) */
     bool cont_wave = false;
+
+    /** Force PLL lock signal. Only used in test. (datasheet §RF_SETUP bit 4) */
+    bool pll_lock  = false;
 
     /* ── Methods ──────────────────────────────────────────────────────── */
 
