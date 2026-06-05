@@ -270,15 +270,8 @@ void nrf24_ce_low(void)  { gpio_set_level(PIN_CE, 0); }
 | Document | What it is | Contains NRF24L01+ SPI commands? |
 |---|---|---|
 | `docs/datasheets/nRF24L01P_PS_v1.0.pdf` | The official Nordic Semiconductor chip specification. Defines every register, SPI command, RF parameter, timing. 6633 lines, text-extracted and verified. | ✅ Yes — this is the primary source |
-| `docs/datasheets/az087_c_20.pdf` | AZ-Delivery **ESP32 Dev Kit C V4** user guide (text-extracted and verified) | ❌ No — this is an ESP32 board guide, not a NRF24L01+ chip spec |
+| `docs/datasheets/az087_c_20.pdf` | AZ-Delivery **ESP32 Dev Kit C V4** user guide | ❌ No |
 
-### Why the local PDF is not the NRF24L01+ spec
-
-When this project was set up, the file `az087_c_20.pdf` was committed under `docs/datasheets/` with the intent of being the NRF24L01+ module datasheet. Text extraction reveals its actual content starts with:
-
-> *"Welcome! Thank you for purchasing our AZ-Delivery ESP-32 Dev Kit C V4."*
-
-It covers ESP32 pin mapping, SPI/I2C interfaces, and Arduino IDE setup — no NRF24L01+ SPI commands whatsoever. The Nordic Product Specification (the actual source for all commands in this doc) is available online at the Nordic Semiconductor docs site.
 
 ### Command provenance table
 
@@ -380,4 +373,4 @@ idf_component_register(
 - [ESP-IDF SPI Master Driver](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/peripherals/spi_master.html) *(verified 2026-06-04)*
 - NRF24L01+ Product Specification v1.0 (Nordic Semiconductor) — local copy: `docs/datasheets/nRF24L01P_PS_v1.0.pdf` — Section 8: Register Map, Section 8.3.1: SPI Commands
 - Online: [NRF24L01+ Product Specification v1.0](https://docs.nordicsemi.com/r/bundle/pdf_ps_nrf24l01p/page/pdf/nrf24/nrf24l01p_ps_1.0/ps_nrf24l01p.html) *(verified 2026-06-05)*
-- ⚠️ Note: `docs/datasheets/az087_c_20.pdf` is the AZ-Delivery ESP32 Dev Kit C V4 user guide — it is **not** the NRF24L01+ datasheet
+- ⚠️ Note: `docs/datasheets/az087_c_20.pdf` is the AZ-Delivery ESP32 Dev Kit C V4 user guide
