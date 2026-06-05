@@ -144,19 +144,20 @@ static void ble_sniffer_task(void *arg)
 
     while (1)
     {
+        const auto &ch = nrf24::ble::ADV_CHANNELS[ch_i];
+
         if ((xTaskGetTickCount() - last_hb) >= pdMS_TO_TICKS(5000))
         {
             uint8_t st = radio.read_reg(nrf24::reg::STATUS);
             printf("[hb] loops=%" PRIu32 "  pkts=%" PRIu32
                    "  STATUS=0x%02X  ch=%s\n",
-                   loop_count, pkt_count, st,
-                   nrf24::ble::ADV_CHANNELS[ch_i].name);
+                   loop_count, pkt_count, st, ch.name);
             last_hb = xTaskGetTickCount();
         }
         loop_count++;
 
-        /* Switch to next advertising channel */
-        nrf24::ble::switch_channel(radio, ch_i);
+        /* Switch to next advertising channel (pass BLE channel index) */
+        nrf24::ble::switch_channel(radio, ch.ch_idx);
 
         /* Listen for 50 ms then rotate */
         TickType_t deadline = xTaskGetTickCount() + pdMS_TO_TICKS(50);
@@ -170,15 +171,14 @@ static void ble_sniffer_task(void *arg)
                 nrf24::ble::clear_irq_flags(radio);
                 radio.flush_rx();
 
-                nrf24::ble::dewhiten(buf, 32,
-                                     nrf24::ble::ADV_CHANNELS[ch_i].ch_idx);
+                nrf24::ble::dewhiten(buf, 32, ch.ch_idx);
 
                 uint8_t pdu_type = buf[0] & 0x0F;
                 uint8_t pdu_len = buf[1] & 0x3F;
                 const char *type = pdu_type_names[pdu_type < 7 ? pdu_type : 7];
 
                 printf("[%s] %-17s  %02X:%02X:%02X:%02X:%02X:%02X  len=%u\n",
-                       nrf24::ble::ADV_CHANNELS[ch_i].name, type,
+                       ch.name, type,
                        buf[7], buf[6], buf[5], buf[4], buf[3], buf[2],
                        pdu_len);
 

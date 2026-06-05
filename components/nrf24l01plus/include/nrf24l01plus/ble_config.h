@@ -93,19 +93,54 @@ inline void clear_irq_flags(Driver &radio)
 }
 
 /**
- * @brief Switch to a different advertising channel.
+ * @brief Convert a BLE channel index (0–39) to an nRF24L01+ RF_CH value.
  *
- * Lowers CE, reprograms RF_CH, clears IRQ flags, flushes RX FIFO,
+ * BLE channel-to-frequency mapping (Bluetooth Core Spec Vol 6 Part B §1.4.1):
+ * - Data channels 0–10:  freq = 2404 + 2*k MHz  → RF_CH = 4 + 2*k
+ * - Data channels 11–36: freq = 2428 + 2*(k-11) MHz → RF_CH = 28 + 2*(k-11)
+ * - Advertising ch 37:   freq = 2402 MHz → RF_CH = 2
+ * - Advertising ch 38:   freq = 2426 MHz → RF_CH = 26
+ * - Advertising ch 39:   freq = 2480 MHz → RF_CH = 80
+ *
+ * @code
+ *   nrf24::ble::channel_to_rf_ch(37) // returns 2
+ *   nrf24::ble::channel_to_rf_ch(0)  // returns 4
+ *   nrf24::ble::channel_to_rf_ch(12) // returns 30
+ * @endcode
+ *
+ * @param ble_channel  BLE channel index (0–39).
+ * @return             nRF24L01+ RF_CH register value (0–80).
+ */
+constexpr uint8_t channel_to_rf_ch(uint8_t ble_channel)
+{
+    if (ble_channel == 37) return 2;
+    if (ble_channel == 38) return 26;
+    if (ble_channel == 39) return 80;
+    if (ble_channel <= 10) return static_cast<uint8_t>(4 + 2 * ble_channel);
+    /* channels 11–36 */
+    return static_cast<uint8_t>(28 + 2 * (ble_channel - 11));
+}
+
+/**
+ * @brief Switch to any BLE channel (0–39).
+ *
+ * Lowers CE, reprograms RF_CH to the frequency corresponding to the
+ * given BLE channel index, clears IRQ flags, flushes RX FIFO,
  * then reasserts CE.
  *
- * @param radio    Driver instance.
- * @param ch_idx   Index into ADV_CHANNELS (0–2).
+ * @code
+ *   nrf24::ble::switch_channel(radio, 37);  // advertising ch 37 (2402 MHz)
+ *   nrf24::ble::switch_channel(radio, 0);   // data ch 0 (2404 MHz)
+ * @endcode
+ *
+ * @param radio        Driver instance.
+ * @param ble_channel  BLE channel index (0–39).
  */
-inline void switch_channel(Driver &radio, uint8_t ch_idx)
+inline void switch_channel(Driver &radio, uint8_t ble_channel)
 {
     radio.ce_low();
     RfCh rf_ch;
-    rf_ch.channel = ADV_CHANNELS[ch_idx].rf_ch;
+    rf_ch.channel = channel_to_rf_ch(ble_channel);
     radio.write_reg(reg::RF_CH, rf_ch.to_byte());
     clear_irq_flags(radio);
     radio.flush_rx();
