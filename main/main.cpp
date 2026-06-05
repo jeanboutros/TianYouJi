@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <inttypes.h>
+#include "nrf24l01plus/registers/status.h"
 #include "sdkconfig.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -41,7 +42,6 @@ static const nrf24::ble::RxConfig rx_config = {
     .payload_width        = 32,
     .scan_duration_ms     = 50,
     .extra_channels       = nullptr,
-    .extra_channel_count  = 0,
 };
 
 static void ble_sniffer_task(void *arg)
@@ -60,10 +60,12 @@ static void ble_sniffer_task(void *arg)
 
         if ((xTaskGetTickCount() - last_hb) >= pdMS_TO_TICKS(5000))
         {
-            uint8_t st = radio.read_reg(nrf24::reg::STATUS);
+            auto st = nrf24::Status::from_byte(radio.read_reg(nrf24::reg::STATUS));
+            char st_buf[96];
+            st.format(st_buf, sizeof(st_buf));
             printf("[hb] loops=%" PRIu32 "  pkts=%" PRIu32
-                   "  STATUS=0x%02X  ble_ch=%u\n",
-                   loop_count, pkt_count, st, ble_ch);
+                   "  STATUS={%s}  ble_ch=%u\n",
+                   loop_count, pkt_count, st_buf, ble_ch);
             last_hb = xTaskGetTickCount();
         }
         loop_count++;

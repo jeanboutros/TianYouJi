@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <cstdio>
 
 namespace nrf24 {
 
@@ -94,6 +95,40 @@ struct Status {
         s.rx_p_no = static_cast<RxPipeNo>((byte >> 1) & 0x07);
         s.tx_full = byte & 0x01;
         return s;
+    }
+
+    /**
+     * @brief Format all STATUS fields as a human-readable "key: value" string.
+     *
+     * @code
+     *   char buf[96];
+     *   nrf24::Status st = nrf24::Status::from_byte(0x4E);
+     *   st.format(buf, sizeof(buf));
+     *   printf("%s\n", buf);
+     *   // "rx_dr: 1, tx_ds: 0, max_rt: 0, rx_p_no: 7 (empty), tx_full: 0"
+     * @endcode
+     *
+     * @param buf  Destination buffer (recommend >= 80 bytes).
+     * @param len  Size of buf in bytes.
+     * @return     Number of characters written (excluding null terminator).
+     */
+    int format(char *buf, size_t len) const {
+        const char *pipe_str;
+        switch (rx_p_no) {
+            case RxPipeNo::Pipe0:   pipe_str = "0"; break;
+            case RxPipeNo::Pipe1:   pipe_str = "1"; break;
+            case RxPipeNo::Pipe2:   pipe_str = "2"; break;
+            case RxPipeNo::Pipe3:   pipe_str = "3"; break;
+            case RxPipeNo::Pipe4:   pipe_str = "4"; break;
+            case RxPipeNo::Pipe5:   pipe_str = "5"; break;
+            case RxPipeNo::NotUsed: pipe_str = "6 (unused)"; break;
+            case RxPipeNo::Empty:   pipe_str = "7 (empty)"; break;
+            default:                pipe_str = "?"; break;
+        }
+        return snprintf(buf, len,
+                        "rx_dr: %u, tx_ds: %u, max_rt: %u, "
+                        "rx_p_no: %s, tx_full: %u",
+                        rx_dr, tx_ds, max_rt, pipe_str, tx_full);
     }
 };
 
