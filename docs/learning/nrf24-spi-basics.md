@@ -259,6 +259,44 @@ void nrf24_ce_low(void)  { gpio_set_level(PIN_CE, 0); }
 
 ---
 
+## About the SPI Command Set: Source Verification
+
+**Q: Are the NRF24L01+ SPI commands in this document from the official chip datasheet?**
+
+**A: Yes — they come from the Nordic Semiconductor NRF24L01+ Product Specification v1.0**, specifically **Section 8.3: SPI Commands and Data Formats**.
+
+### Source breakdown
+
+| Document | What it is | Contains NRF24L01+ SPI commands? |
+|---|---|---|
+| *NRF24L01+ Product Specification v1.0* (Nordic Semiconductor) | The official chip specification. Defines every register, SPI command, RF parameter, timing. | ✅ Yes — this is the primary source |
+| `docs/datasheets/az087_c_20.pdf` | AZ-Delivery **ESP32 Dev Kit C V4** user guide (text-extracted and verified) | ❌ No — this is an ESP32 board guide, not a NRF24L01+ chip spec |
+
+### Why the local PDF is not the NRF24L01+ spec
+
+When this project was set up, the file `az087_c_20.pdf` was committed under `docs/datasheets/` with the intent of being the NRF24L01+ module datasheet. Text extraction reveals its actual content starts with:
+
+> *"Welcome! Thank you for purchasing our AZ-Delivery ESP-32 Dev Kit C V4."*
+
+It covers ESP32 pin mapping, SPI/I2C interfaces, and Arduino IDE setup — no NRF24L01+ SPI commands whatsoever. The Nordic Product Specification (the actual source for all commands in this doc) is available online at the Nordic Semiconductor docs site.
+
+### Command provenance table
+
+All commands used in this learning document trace directly to **Table 16** in the Nordic Product Specification v1.0:
+
+| Command | Encoding | Section |
+|---|---|---|
+| `R_REGISTER` | `000A AAAA` (0x00–0x1F) | Table 16 |
+| `W_REGISTER` | `001A AAAA` (0x20–0x3F) | Table 16 |
+| `R_RX_PAYLOAD` | `0110 0001` (0x61) | Table 16 |
+| `W_TX_PAYLOAD` | `1010 0000` (0xA0) | Table 16 |
+| `FLUSH_TX` | `1110 0001` (0xE1) | Table 16 |
+| `FLUSH_RX` | `1110 0010` (0xE2) | Table 16 |
+| `REUSE_TX_PL` | `1110 0011` (0xE3) | Table 16 |
+| `NOP` | `1111 1111` (0xFF) | Table 16 |
+
+---
+
 ## What is DMA?
 
 **DMA (Direct Memory Access)** is a hardware feature that lets peripherals transfer data directly to/from RAM without involving the CPU.
@@ -340,5 +378,5 @@ idf_component_register(
 ## References
 
 - [ESP-IDF SPI Master Driver](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/peripherals/spi_master.html) *(verified 2026-06-04)*
-- [NRF24L01+ Product Specification v1.0 (Nordic Semiconductor)](https://infocenter.nordicsemi.com/pdf/nRF24L01P_PS_v1.0.pdf) — Section 8: Register Map, Section 8.3: SPI Commands
-- NRF24L01 datasheet available locally: `docs/datasheets/az087_c_20.pdf`
+- [NRF24L01+ Product Specification v1.0 (Nordic Semiconductor)](https://docs.nordicsemi.com/r/bundle/pdf_ps_nrf24l01p/page/pdf/nrf24/nrf24l01p_ps_1.0/ps_nrf24l01p.html) — Section 8: Register Map, Section 8.3: SPI Commands *(verified 2026-06-05)*
+- ⚠️ Note: `docs/datasheets/az087_c_20.pdf` is the AZ-Delivery ESP32 Dev Kit C V4 user guide — it is **not** the NRF24L01+ datasheet

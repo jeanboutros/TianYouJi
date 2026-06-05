@@ -335,5 +335,5 @@ With dynamic payloads:
 ## References
 
 - [ESP-IDF SPI Master Driver](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/peripherals/spi_master.html) *(verified 2026-06-04)*
-- [NRF24L01+ Product Specification v1.0](https://infocenter.nordicsemi.com/pdf/nRF24L01P_PS_v1.0.pdf) — Chapter 7: Data and Control Interface
-- NRF24L01 datasheet: `docs/datasheets/az087_c_20.pdf`
+- [NRF24L01+ Product Specification v1.0 (Nordic Semiconductor)](https://docs.nordicsemi.com/r/bundle/pdf_ps_nrf24l01p/page/pdf/nrf24/nrf24l01p_ps_1.0/ps_nrf24l01p.html) — Chapter 7: Data and Control Interface *(verified 2026-06-05)*
+- ⚠️ Note: `docs/datasheets/az087_c_20.pdf` is the AZ-Delivery ESP32 Dev Kit C V4 user guide — it is **not** the NRF24L01+ datasheet
