@@ -39,6 +39,51 @@ Every new **function**, **struct**, **class**, **enum**, or **macro group** must
 - Comments inside the function body remain as `/* short inline notes */` — do **not** duplicate the Doxygen block content there.
 - This style applies to C and C++ equally.
 
+## Hardware Register Library Design Principles (MANDATORY)
+
+These rules apply whenever modelling hardware registers, peripherals, or protocol fields in C/C++ libraries.
+
+### Datasheet is the source of truth — no assumptions, no invention
+
+- **Read the datasheet first.** Every field name, bit position, encoding, and default value must come from the datasheet, not from intuition, training data, or prior experience with similar chips.
+- **Never invent a value or field.** If a bit's meaning is not described in the datasheet, leave it unnamed (e.g. `reserved`) — do not guess.
+- **If something is unclear in the datasheet, check the web** (application notes, errata, community reports) before writing any code. Use `fetch_webpage` on official sources.
+- **If it is not in the datasheet and not on the web, do not make it up.** Stop, ask the user for clarification, or mark the field explicitly as `/* unknown — not documented */`.
+
+### Typed enums for every field — no raw integers in the API
+
+- Every register field that has a finite set of legal values **must be an `enum class`**, not an `int` or `uint8_t` literal.
+- Enum enumerator names must come **verbatim from the datasheet symbol names** wherever possible (e.g. `RF_DR_LOW`, `RF_PWR`). Use CamelCase only when the datasheet uses all-caps abbreviations that would be unreadable as-is.
+- **No "catch-all" or "raw value" enumerators** (e.g. `Raw = 0xFF`). If the user needs a raw escape hatch, provide a separate `from_byte()` / `to_byte()` path on the struct, not inside the enum.
+
+### Library API design — give users a vocabulary, not a raw byte
+
+The goal is that a user calling the library can **read and understand the intent** of their code without looking at the datasheet:
+
+```cpp
+// BAD — opaque, error-prone, requires the user to memorise bit positions
+nrf24_write_reg(REG_RF_SETUP, 0x26);
+
+// GOOD — self-documenting, impossible to put a field in the wrong position
+nrf24::RfSetup rf;
+rf.data_rate = nrf24::DataRate::Mbps1;
+rf.tx_power  = nrf24::TxPower::dBm0;
+nrf24_write_reg(REG_RF_SETUP, rf.to_byte());
+```
+
+Rules:
+- Expose **one `enum class` per field**, with an enumerator for every value the datasheet defines.
+- Expose **one aggregate struct per register** with typed fields, `to_byte()`, and `from_byte()`.
+- Expose **`to_reg(FieldType)` free functions** (overloaded per field type) so users can compose individual fields without constructing a full struct.
+- Keep internal helpers (bit-splitting, encoding tables) in a `detail` sub-namespace so they do not pollute the public API.
+- Headers are a library contract — **no learning notes, no TODO comments, no design rationale** in headers. That material belongs in `docs/learning/`.
+
+### Completeness — model the full register, nothing less
+
+- Every bit in a register must be accounted for, even reserved bits.
+- Reserved bits are represented as unnamed padding or a note in the Doxygen block — **never silently ignored** in `to_byte()` or `from_byte()`.
+- If a multi-bit field has a non-contiguous encoding (e.g. nRF24 `DataRate` spans bits 5 and 3), the encoding logic **must follow the datasheet's table exactly** — use a helper in `detail::` rather than inventing a compact representation.
+
 ## Knowledge Management Rules
 
 ### Learning Summaries
