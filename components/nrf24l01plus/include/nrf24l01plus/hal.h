@@ -73,6 +73,27 @@ public:
      *            on a 1000 Hz FreeRTOS config).
      */
     virtual void delay_ms(uint32_t ms) = 0;
+
+    /**
+     * @brief Busy-wait for the specified number of microseconds.
+     *
+     * Used for nRF24L01+ timing constraints that are too short for
+     * millisecond granularity — e.g. Tstby2a (130 µs max Standby-I →
+     * RX settling time) and RPD validity (170 µs after CE HIGH, per
+     * datasheet §6.1.7 Table 16).
+     *
+     * Implementations should use a busy-wait spin (not a task yield)
+     * because the delay is too short for OS scheduler granularity.
+     *
+     * @code
+     *   // Wait 200 µs for RX settling after CE HIGH
+     *   hal.delay_us(200);
+     * @endcode
+     *
+     * @param us  Duration in microseconds.  Accuracy depends on the
+     *            platform's busy-wait timer resolution.
+     */
+    virtual void delay_us(uint32_t us) = 0;
 };
 
 } // namespace nrf24

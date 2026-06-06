@@ -52,6 +52,16 @@ public:
     void ce_high() override;
     void ce_low() override;
     void delay_ms(uint32_t ms) override;
+    /**
+     * @brief Busy-wait for the specified number of microseconds.
+     *
+     * Uses the ESP-IDF ROM busy-wait function (esp_rom_delay_us),
+     * which is appropriate for delays too short for FreeRTOS
+     * scheduler granularity (sub-millisecond).
+     *
+     * @param us  Duration in microseconds.
+     */
+    void delay_us(uint32_t us) override;
 
     /**
      * @brief Get the MOSI pin number (for platform-specific post-init control).

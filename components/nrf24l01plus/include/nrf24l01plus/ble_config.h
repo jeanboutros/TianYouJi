@@ -229,7 +229,15 @@ constexpr uint8_t channel_to_rf_ch(uint8_t ble_channel)
  *
  * Lowers CE, reprograms RF_CH to the frequency corresponding to the
  * given BLE channel index, clears IRQ flags, flushes RX FIFO,
- * then reasserts CE.
+ * reasserts CE, then waits for the Standby-I → RX settling time.
+ *
+ * The 200 µs delay after CE HIGH satisfies both:
+ * - Tstby2a (130 µs max, per datasheet §6.1.7 Table 16): time from
+ *   Standby-I to a valid RX state.
+ * - RPD validity (170 µs = 130 µs settling + 40 µs AGC): earliest
+ *   time at which the Received Power Detector gives a reliable result.
+ *
+ * 200 µs provides comfortable margin over both thresholds.
  *
  * @code
  *   nrf24::ble::switch_channel(radio, 37);  // advertising ch 37 (2402 MHz)
@@ -248,6 +256,11 @@ inline void switch_channel(Driver &radio, uint8_t ble_channel)
     clear_irq_flags(radio);
     radio.flush_rx();
     radio.ce_high();
+
+    /* Datasheet §6.1.7 Table 16: Tstby2a = 130 µs (Standby-I → RX).
+     * RPD is valid 170 µs after CE HIGH (130 µs + 40 µs AGC).
+     * 200 µs provides margin over both thresholds. */
+    radio.hal().delay_us(200);
 }
 
 /**

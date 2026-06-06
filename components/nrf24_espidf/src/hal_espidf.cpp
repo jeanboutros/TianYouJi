@@ -1,5 +1,6 @@
 #include "nrf24_espidf/hal_espidf.h"
 #include "esp_check.h"
+#include "esp_rom_sys.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include <cstring>
@@ -103,6 +104,11 @@ void EspIdfHal::ce_low()
 void EspIdfHal::delay_ms(uint32_t ms)
 {
     vTaskDelay(pdMS_TO_TICKS(ms));
+}
+
+void EspIdfHal::delay_us(uint32_t us)
+{
+    esp_rom_delay_us(us);
 }
 
 } // namespace nrf24
