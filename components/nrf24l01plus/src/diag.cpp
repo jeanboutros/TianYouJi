@@ -45,15 +45,22 @@ bool spi_comm_test(Driver &radio)
     printf("Stage 1: SPI connectivity check\n");
 
     /* STATUS — POR value 0x0E (RX_P_NO=111=empty, no IRQ flags, TX not full).
-     * This is the single most definitive test: if STATUS reads correctly,
-     * the SPI bus is working and the device is alive. */
+     * If STATUS reads as 0x0E exactly, SPI is working and the device is in
+     * its POR state.  However, stray RF energy during power-up can set
+     * IRQ flags (RX_DR=0x40, TX_DS=0x20, MAX_RT=0x10), producing STATUS
+     * values like 0x40, 0x4E, 0x7E, etc.  The definitive SPI failure
+     * indicator is STATUS=0xFF (MISO stuck high = no device on bus).
+     * Any non-0xFF reading confirms the nRF24 is alive and SPI works. */
     bool spi_alive = false;
+    bool status_is_por = false;
     {
         auto actual = radio.read_reg(Status{});
         uint8_t raw = actual.to_byte();
-        spi_alive = (raw == Status::RESET_VALUE);
+        spi_alive = (raw != 0xFF);
+        status_is_por = (raw == Status::RESET_VALUE);
         printf("  STATUS     exp=0x%02X  got=0x%02X  [%s]%s\n",
-               Status::RESET_VALUE, raw, spi_alive ? "PASS" : "FAIL",
+               Status::RESET_VALUE, raw, status_is_por ? "PASS" :
+               (spi_alive ? "OK (IRQ flags set — stray RF during POR)" : "FAIL"),
                (raw == 0xFF) ? "  *** MISO stuck high — no device or bad wiring" : "");
         if (!spi_alive) {
             printf("  SPI communication FAILED — cannot proceed.\n");

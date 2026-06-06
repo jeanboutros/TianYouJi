@@ -35,10 +35,20 @@ void EspIdfHal::init(const EspIdfPins &pins)
     dev_cfg.queue_size     = 1;
     ESP_ERROR_CHECK(spi_bus_add_device(pins.spi_host, &dev_cfg, &spi_handle_));
 
-    /* CE pin: output, initially low (standby-I) */
+    /* CE pin: input-output, initially low (standby-I).
+     * GPIO_MODE_INPUT_OUTPUT enables the input buffer so that
+     * gpio_get_level() returns the actual pad level, which is
+     * essential for CE readback diagnostics.  With OUTPUT-only
+     * mode, gpio_get_level() always returns 0 regardless of the
+     * driven level (ESP-IDF GPIO driver documentation).
+     *
+     * Note: GPIO5 is SPI3_HOST's native IO_MUX CS0 pin.  Setting
+     * the function selector to PIN_FUNC_GPIO disconnects the
+     * IO_MUX CS0 signal from the pad, but moving CE to a
+     * non-IOMUX pin (e.g. GPIO4) would eliminate this overlap. */
     gpio_config_t gpio_cfg = {
         .pin_bit_mask   = (1ULL << pins.ce),
-        .mode           = GPIO_MODE_OUTPUT,
+        .mode           = GPIO_MODE_INPUT_OUTPUT,
         .pull_up_en     = GPIO_PULLUP_DISABLE,
         .pull_down_en   = GPIO_PULLDOWN_DISABLE,
         .intr_type      = GPIO_INTR_DISABLE,

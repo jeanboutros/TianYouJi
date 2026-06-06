@@ -35,15 +35,31 @@ inline constexpr AdvChannel ADV_CHANNELS[3] = {
 };
 
 /**
- * @brief BLE advertising access address (0x8E89BED6), bit-reversed per byte.
+ * @brief BLE advertising access address (0x8E89BED6), bit-reversed per
+ *        byte, in nRF24L01+ SPI LSByte-first write order.
  *
- * BLE transmits LSbit-first; nRF24L01+ addresses are MSbit-first.
- * Each byte is bit-mirrored:
+ * BLE transmits LSBit-first per byte; nRF24L01+ addresses are MSBit-first.
+ * Each byte is bit-mirrored via swapbits().  The byte order follows the
+ * nRF24L01+ SPI convention (datasheet §8.3.1: "LSByte is written first")
+ * where the first SPI data byte maps to the register LSByte.
+ *
+ * Transformation chain:
+ * - BLE AA 0x8E89BED6 on-air (LSByte-first): D6 BE 89 8E
+ * - Per-byte bit-swap (BLE LSBit → nRF24 MSBit):
+ *   swapbits(0xD6)=0x6B  swapbits(0xBE)=0x7D
+ *   swapbits(0x89)=0x91  swapbits(0x8E)=0x71
+ * - nRF24 on-air byte order (MSByte first): 6B 7D 91 71
+ * - nRF24 SPI write order (LSByte first):  71 91 7D 6B
+ *
  * @code
- *   0xD6 → 0x6B,  0xBE → 0x7D,  0x89 → 0x91,  0x8E → 0x71
+ *   // SPI data byte 1 (LSByte) = swapbits(0x8E) = 0x71
+ *   // SPI data byte 2           = swapbits(0x89) = 0x91
+ *   // SPI data byte 3           = swapbits(0xBE) = 0x7D
+ *   // SPI data byte 4 (MSByte) = swapbits(0xD6) = 0x6B
+ *   radio.write_reg_multi(reg::RX_ADDR_P0, ADV_ACCESS_ADDR, 4);
  * @endcode
  */
-inline constexpr uint8_t ADV_ACCESS_ADDR[4] = {0x6B, 0x7D, 0x91, 0x71};
+inline constexpr uint8_t ADV_ACCESS_ADDR[4] = {0x71, 0x91, 0x7D, 0x6B};
 
 /**
  * @brief Configuration for BLE passive RX mode.

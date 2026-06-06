@@ -168,12 +168,12 @@ static void print_register_diagnostics(nrf24::Driver &radio)
            static_cast<unsigned>(fifo.tx_reuse),
            fifo.to_byte());
 
-    /* RX_ADDR_P0 — expect {0x6B, 0x7D, 0x91, 0x71} (BLE adv access addr) */
+    /* RX_ADDR_P0 — expect {0x71, 0x91, 0x7D, 0x6B} (BLE adv access addr, LSByte-first SPI) */
     uint8_t addr[4];
     radio.read_reg_multi(nrf24::reg::RX_ADDR_P0, addr, 4);
-    printf("  RX_ADDR_P0  %02X:%02X:%02X:%02X  (exp 6B:7D:91:71)  %s\n",
+    printf("  RX_ADDR_P0  %02X:%02X:%02X:%02X  (exp 71:91:7D:6B)  %s\n",
            addr[0], addr[1], addr[2], addr[3],
-           (addr[0]==0x6B && addr[1]==0x7D && addr[2]==0x91 && addr[3]==0x71)
+           (addr[0]==0x71 && addr[1]==0x91 && addr[2]==0x7D && addr[3]==0x6B)
                ? "[OK]" : "[FAIL: address mismatch!]");
 
     /* TX_ADDR — expect same as RX_ADDR_P0 for promiscuous sniffing */
