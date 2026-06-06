@@ -148,14 +148,21 @@ bool spi_comm_test(Driver &radio)
      * because it is a simple 6-bit register with no side effects and no
      * dependency on other register state.
      *
-     * We test four patterns:
+     * We test four patterns, masking to the 6 valid bits [5:0] of EN_AA.
+     * Bits [7:6] are reserved per datasheet §9.1 and are silently ignored
+     * by the hardware — writing 0x55 (bit 6 set) stores only the lower 6
+     * bits, so readback is 0x15, not 0x55.  The comparison must mask.
+     *
      *   0x00 — all pipes disabled (important for BLE CRC=0)
      *   0x3F — all pipes enabled (POR default)
-     *   0x55 — alternating 0/1 pattern
+     *   0x55 — alternating 0/1 pattern (masked: 0x15)
      *   0x2A — complementary alternating pattern
      *
      * If all four writes verify, SPI writes are confirmed working. */
     printf("\nStage 2: Write-verify test (EN_AA register)\n");
+
+    /* EN_AA has 6 valid bits [5:0]; bits [7:6] are reserved (§9.1). */
+    static constexpr uint8_t EN_AA_VALID_MASK = 0x3F;
 
     static constexpr uint8_t write_patterns[] = {0x00, 0x3F, 0x55, 0x2A};
     bool writes_ok = true;
@@ -163,9 +170,12 @@ bool spi_comm_test(Driver &radio)
         EnAa en_aa = EnAa::from_byte(pattern);
         radio.write_reg(en_aa);
         uint8_t readback = radio.read_reg(EnAa{}).to_byte();
-        bool match = (readback == pattern);
-        printf("  write EN_AA=0x%02X  read=0x%02X  [%s]\n",
-               pattern, readback, match ? "PASS" : "FAIL");
+        /* Mask both sides to valid bits — reserved bits are read as 0
+         * but may be written as 1 in the test pattern. */
+        bool match = (readback & EN_AA_VALID_MASK) == (pattern & EN_AA_VALID_MASK);
+        printf("  write EN_AA=0x%02X  read=0x%02X  [%s]%s\n",
+               pattern, readback, match ? "PASS" : "FAIL",
+               match ? "" : "  (mask=0x3F: reserved bits [7:6] ignored)");
         if (!match) writes_ok = false;
     }
 
