@@ -145,12 +145,15 @@ struct RxConfig {
  * - Pipe 0 RX address set to BLE advertising access address
  * - Specified RF channel from ADV_CHANNELS
  *
- * After calling, assert CE high to begin receiving.
+ * After programming registers, this function waits for the PWR_UP
+ * oscillator settling delay (2 ms, per datasheet §6.1.2 Table 9)
+ * and asserts CE HIGH to transition the device into RX mode.
+ * The caller does NOT need to call ce_high() again after this function.
  *
  * @code
  *   nrf24::Driver radio(hal);
  *   nrf24::ble::configure_rx(radio);
- *   radio.ce_high();  // start listening
+ *   // Device is now in RX mode — ready to receive
  * @endcode
  *
  * @param radio   Driver instance (dependency injection).
@@ -173,11 +176,7 @@ inline void clear_irq_flags(Driver &radio)
     st.rx_dr  = true;
     st.tx_ds  = true;
     st.max_rt = true;
-    /* Use the raw uint8_t overload because there is no typed write_reg(Status)
-       overload yet — write_reg(reg::STATUS, byte) is the only path available
-       for writing STATUS.  The st.to_byte() call still ensures typed
-       serialisation with reserved-bit handling. */
-    radio.write_reg(reg::STATUS, st.to_byte());
+    radio.write_reg(st);
 }
 
 /**
@@ -229,7 +228,7 @@ inline void switch_channel(Driver &radio, uint8_t ble_channel)
     radio.ce_low();
     RfCh rf_ch;
     rf_ch.channel = channel_to_rf_ch(ble_channel);
-    radio.write_reg(reg::RF_CH, rf_ch.to_byte());
+    radio.write_reg(rf_ch);
     clear_irq_flags(radio);
     radio.flush_rx();
     radio.ce_high();

@@ -104,6 +104,26 @@ struct RxPw {
  */
 struct RxPwP0 : RxPw {
     static constexpr uint8_t ADDRESS = 0x11;
+
+    /**
+     * @brief Reconstruct an RxPwP0 from a raw byte read from register 0x11.
+     *
+     * Overrides the base RxPw::from_byte to return the derived type,
+     * enabling use with the typed Driver::read_reg() template.
+     *
+     * @code
+     *   auto pw0 = nrf24::RxPwP0::from_byte(0x20);
+     *   // pw0.payload_width == 32, pw0 is RxPwP0 (not sliced to RxPw)
+     * @endcode
+     *
+     * @param byte  Raw value read from register 0x11.
+     * @return      Populated RxPwP0 with payload_width extracted from bits 5:0.
+     */
+    static constexpr RxPwP0 from_byte(uint8_t byte) {
+        RxPwP0 r;
+        r.payload_width = byte & 0x3F;
+        return r;
+    }
 };
 
 /**
@@ -111,6 +131,21 @@ struct RxPwP0 : RxPw {
  */
 struct RxPwP1 : RxPw {
     static constexpr uint8_t ADDRESS = 0x12;
+
+    /**
+     * @brief Reconstruct an RxPwP1 from a raw byte read from register 0x12.
+     *
+     * Overrides the base RxPw::from_byte to return the derived type,
+     * enabling use with the typed Driver::read_reg() template.
+     *
+     * @param byte  Raw value read from register 0x12.
+     * @return      Populated RxPwP1 with payload_width extracted from bits 5:0.
+     */
+    static constexpr RxPwP1 from_byte(uint8_t byte) {
+        RxPwP1 r;
+        r.payload_width = byte & 0x3F;
+        return r;
+    }
 };
 
 /**
@@ -118,6 +153,21 @@ struct RxPwP1 : RxPw {
  */
 struct RxPwP2 : RxPw {
     static constexpr uint8_t ADDRESS = 0x13;
+
+    /**
+     * @brief Reconstruct an RxPwP2 from a raw byte read from register 0x13.
+     *
+     * Overrides the base RxPw::from_byte to return the derived type,
+     * enabling use with the typed Driver::read_reg() template.
+     *
+     * @param byte  Raw value read from register 0x13.
+     * @return      Populated RxPwP2 with payload_width extracted from bits 5:0.
+     */
+    static constexpr RxPwP2 from_byte(uint8_t byte) {
+        RxPwP2 r;
+        r.payload_width = byte & 0x3F;
+        return r;
+    }
 };
 
 /**
@@ -125,6 +175,21 @@ struct RxPwP2 : RxPw {
  */
 struct RxPwP3 : RxPw {
     static constexpr uint8_t ADDRESS = 0x14;
+
+    /**
+     * @brief Reconstruct an RxPwP3 from a raw byte read from register 0x14.
+     *
+     * Overrides the base RxPw::from_byte to return the derived type,
+     * enabling use with the typed Driver::read_reg() template.
+     *
+     * @param byte  Raw value read from register 0x14.
+     * @return      Populated RxPwP3 with payload_width extracted from bits 5:0.
+     */
+    static constexpr RxPwP3 from_byte(uint8_t byte) {
+        RxPwP3 r;
+        r.payload_width = byte & 0x3F;
+        return r;
+    }
 };
 
 /**
@@ -132,6 +197,21 @@ struct RxPwP3 : RxPw {
  */
 struct RxPwP4 : RxPw {
     static constexpr uint8_t ADDRESS = 0x15;
+
+    /**
+     * @brief Reconstruct an RxPwP4 from a raw byte read from register 0x15.
+     *
+     * Overrides the base RxPw::from_byte to return the derived type,
+     * enabling use with the typed Driver::read_reg() template.
+     *
+     * @param byte  Raw value read from register 0x15.
+     * @return      Populated RxPwP4 with payload_width extracted from bits 5:0.
+     */
+    static constexpr RxPwP4 from_byte(uint8_t byte) {
+        RxPwP4 r;
+        r.payload_width = byte & 0x3F;
+        return r;
+    }
 };
 
 /**
@@ -139,6 +219,21 @@ struct RxPwP4 : RxPw {
  */
 struct RxPwP5 : RxPw {
     static constexpr uint8_t ADDRESS = 0x16;
+
+    /**
+     * @brief Reconstruct an RxPwP5 from a raw byte read from register 0x16.
+     *
+     * Overrides the base RxPw::from_byte to return the derived type,
+     * enabling use with the typed Driver::read_reg() template.
+     *
+     * @param byte  Raw value read from register 0x16.
+     * @return      Populated RxPwP5 with payload_width extracted from bits 5:0.
+     */
+    static constexpr RxPwP5 from_byte(uint8_t byte) {
+        RxPwP5 r;
+        r.payload_width = byte & 0x3F;
+        return r;
+    }
 };
 
 } // namespace nrf24

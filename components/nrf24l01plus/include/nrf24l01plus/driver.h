@@ -16,7 +16,10 @@ namespace nrf24 {
  *   EspIdfHal hal;
  *   hal.init(pins);
  *   nrf24::Driver radio(hal);
- *   radio.write_reg(nrf24::reg::CONFIG, nrf24::Config().to_byte());
+ *   nrf24::Config cfg;
+ *   cfg.power_mode = nrf24::PowerMode::Up;
+ *   cfg.primary    = nrf24::PrimaryMode::RX;
+ *   radio.write_reg(cfg);
  *   radio.ce_high();                // Enter RX mode
  * @endcode
  */
@@ -29,50 +32,6 @@ public:
      *             this Driver instance.
      */
     explicit Driver(Hal &hal) : hal_(hal) {}
-
-    /**
-     * @brief Read a single-byte register.
-     *
-     * Sends the R_REGISTER command (bits [7:5] = 000) with the 5-bit
-     * register address and clocks out one byte on MISO.
-     *
-     * @code
-     *   cmd byte: 0b000A_AAAA   (A = reg address)
-     *   read_reg(nrf24::reg::STATUS) -> cmd = 0x07, reads STATUS
-     * @endcode
-     *
-     * @param reg  Register address (only bits [4:0] used).  Use constants
-     *              from nrf24l01plus/registers/addresses.h (e.g. nrf24::reg::STATUS).
-     * @return     The byte value read from the register.
-     */
-    uint8_t read_reg(uint8_t reg);
-
-    /**
-     * @brief Write a single-byte register.
-     *
-     * Sends the W_REGISTER command (bits [7:5] = 001) with the 5-bit
-     * register address followed by one data byte on MOSI.
-     *
-     * Prefer the typed struct overload (write_reg(cfg)) for single-byte
-     * registers — it deduces the address and prevents wrong-register
-     * mistakes at compile time.
-     *
-     * @code
-     *   // Preferred: typed struct overload (deduces address)
-     *   nrf24::Config cfg;
-     *   cfg.power_mode = nrf24::PowerMode::Up;
-     *   cfg.primary    = nrf24::PrimaryMode::RX;
-     *   radio.write_reg(cfg);
-     *
-     *   // Low-level: internal use only (does not enforce struct types)
-     *   radio.write_reg(nrf24::reg::CONFIG, cfg.to_byte());
-     * @endcode
-     *
-     * @param reg    Register address (only bits [4:0] used).  Use constants
-     *               from nrf24l01plus/registers/addresses.h (e.g. nrf24::reg::CONFIG).
-     * @param value  Byte to write into the register.
-     */
-    void write_reg(uint8_t reg, uint8_t value);
 
     /**
      * @brief Write a multi-byte register (e.g. TX_ADDR, RX_ADDR_Px).
@@ -135,35 +94,6 @@ public:
      * @brief Drive CE pin low (return to standby-I).
      */
     void ce_low();
-
-    /**
-     * @brief Write a register and verify the value was accepted by the device.
-     *
-     * Writes `value` to the register at `reg`, then immediately reads it back
-     * and compares.  Useful for debugging SPI communication issues where a
-     * write may silently fail (e.g. MOSI pin misconfigured, wrong register
-     * address, or device not responding).
-     *
-     * This is NOT the default write path — it adds a round-trip read and
-     * comparison, so should only be used during debug/validation sequences.
-     *
-     * @code
-     *   nrf24::Config cfg;
-     *   cfg.power_mode = nrf24::PowerMode::Up;
-     *   cfg.primary    = nrf24::PrimaryMode::RX;
-     *   bool ok = radio.write_and_verify(cfg);
-     *   // ok == true  → device accepted the write
-     *   // ok == false → read-back mismatch (SPI or write issue)
-     * @endcode
-     *
-     * Prefer the typed struct overload (write_and_verify(cfg)) for single-byte
-     * registers — it deduces the address and normalises reserved bits.
-     *
-     * @param reg    Register address (use constants from nrf24::reg::).  // internal use
-     * @param value  Byte to write.                                        // internal use
-     * @return       true if read-back matches value, false otherwise.
-     */
-    bool write_and_verify(uint8_t reg, uint8_t value);
 
     /**
      * @brief Write a multi-byte register and verify all bytes were accepted.
@@ -252,6 +182,40 @@ public:
     Hal &hal() { return hal_; }
 
 private:
+    /**
+     * @brief Read a single-byte register (internal, address by raw uint8_t).
+     *
+     * Used internally by the typed template overload to access the SPI layer.
+     * Prefer the typed overload read_reg(StructType{}) for all external code.
+     *
+     * @param reg  Register address (only bits [4:0] used).
+     * @return     The byte value read from the register.
+     */
+    uint8_t read_reg(uint8_t reg);
+
+    /**
+     * @brief Write a single-byte register (internal, address by raw uint8_t).
+     *
+     * Used internally by the typed template overload to access the SPI layer.
+     * Prefer the typed overload write_reg(cfg) for all external code.
+     *
+     * @param reg    Register address (only bits [4:0] used).
+     * @param value  Byte to write into the register.
+     */
+    void write_reg(uint8_t reg, uint8_t value);
+
+    /**
+     * @brief Write and verify a single-byte register (internal, address by raw uint8_t).
+     *
+     * Used internally by the typed template overload.  Prefer the typed
+     * overload write_and_verify(cfg) for all external code.
+     *
+     * @param reg    Register address (only bits [4:0] used).
+     * @param value  Byte to write into the register.
+     * @return       true if read-back matches value, false otherwise.
+     */
+    bool write_and_verify(uint8_t reg, uint8_t value);
+
     Hal &hal_;
 };
 

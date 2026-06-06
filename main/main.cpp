@@ -88,14 +88,10 @@ static void print_register_diagnostics(nrf24::Driver &radio)
            en_rx.to_byte());
 
     /* RX_PW_P0 — expect 32 bytes (0x20) */
-    /* Note: RxPwP0 inherits from_byte() from RxPw, which returns RxPw (not
-       RxPwP0), so the typed read_reg overload cannot deduce the derived type.
-       Use the raw read + from_byte pattern instead. */
-    uint8_t raw_pw = radio.read_reg(nrf24::RxPwP0::ADDRESS);
-    auto pw = nrf24::RxPw::from_byte(raw_pw);
+    auto pw0 = radio.read_reg(nrf24::RxPwP0{});
     printf("  RX_PW_P0    payload_width=%u  (raw 0x%02X)\n",
-           pw.payload_width,
-           pw.to_byte());
+           pw0.payload_width,
+           pw0.to_byte());
 
     /* RX_ADDR_P0 — expect {0x6B, 0x7D, 0x91, 0x71} (BLE adv access addr) */
     uint8_t addr[4];

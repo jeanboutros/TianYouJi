@@ -65,30 +65,70 @@ bool verify_ble_rx(Driver &radio, const ble::RxConfig &config)
 
     RxPw exp_pw{config.payload_width};
 
-    const struct {
-        const char *name;
-        uint8_t     reg;
-        uint8_t     expected;
-        uint8_t     mask;
-    } checks[] = {
-        { "CONFIG",     reg::CONFIG,     exp_config.to_byte(),  REG_MASK_ALL },
-        { "EN_AA",      reg::EN_AA,      exp_en_aa.to_byte(),   REG_MASK_ALL },
-        { "EN_RXADDR",  reg::EN_RXADDR,  exp_en_rx.to_byte(),   REG_MASK_ALL },
-        { "SETUP_AW",   reg::SETUP_AW,   exp_aw.to_byte(),      REG_MASK_ALL },
-        { "SETUP_RETR", reg::SETUP_RETR, exp_retr.to_byte(),    REG_MASK_ALL },
-        { "RF_CH",      reg::RF_CH,      exp_rf_ch.to_byte(),   REG_MASK_RF_CH },
-        { "RF_SETUP",   reg::RF_SETUP,   exp_rf.to_byte(),      REG_MASK_ALL },
-        { "RX_PW_P0",   reg::RX_PW_P0,  exp_pw.to_byte(),      REG_MASK_RX_PW },
-    };
-
-    for (int i = 0; i < (int)(sizeof(checks) / sizeof(checks[0])); i++) {
-        uint8_t val  = radio.read_reg(checks[i].reg);
-        uint8_t got  = val  & checks[i].mask;
-        uint8_t want = checks[i].expected & checks[i].mask;
-        bool    pass = (got == want);
-        printf("  %-10s  reg=0x%02X  exp=0x%02X  got=0x%02X  [%s]\n",
-               checks[i].name, checks[i].reg, want, got,
-               pass ? "PASS" : "FAIL");
+    /* Verify each register using typed reads and comparisons */
+    {   /* CONFIG */
+        auto actual = radio.read_reg(Config{});
+        bool pass = (actual.to_byte() & REG_MASK_ALL) == (exp_config.to_byte() & REG_MASK_ALL);
+        printf("  %-10s  exp=0x%02X  got=0x%02X  [%s]\n",
+               "CONFIG", exp_config.to_byte() & REG_MASK_ALL,
+               actual.to_byte() & REG_MASK_ALL, pass ? "PASS" : "FAIL");
+        if (!pass) all_pass = false;
+    }
+    {   /* EN_AA */
+        auto actual = radio.read_reg(EnAa{});
+        bool pass = (actual.to_byte() & REG_MASK_ALL) == (exp_en_aa.to_byte() & REG_MASK_ALL);
+        printf("  %-10s  exp=0x%02X  got=0x%02X  [%s]\n",
+               "EN_AA", exp_en_aa.to_byte() & REG_MASK_ALL,
+               actual.to_byte() & REG_MASK_ALL, pass ? "PASS" : "FAIL");
+        if (!pass) all_pass = false;
+    }
+    {   /* EN_RXADDR */
+        auto actual = radio.read_reg(EnRxAddr{});
+        bool pass = (actual.to_byte() & REG_MASK_ALL) == (exp_en_rx.to_byte() & REG_MASK_ALL);
+        printf("  %-10s  exp=0x%02X  got=0x%02X  [%s]\n",
+               "EN_RXADDR", exp_en_rx.to_byte() & REG_MASK_ALL,
+               actual.to_byte() & REG_MASK_ALL, pass ? "PASS" : "FAIL");
+        if (!pass) all_pass = false;
+    }
+    {   /* SETUP_AW */
+        auto actual = radio.read_reg(SetupAw{});
+        bool pass = (actual.to_byte() & REG_MASK_ALL) == (exp_aw.to_byte() & REG_MASK_ALL);
+        printf("  %-10s  exp=0x%02X  got=0x%02X  [%s]\n",
+               "SETUP_AW", exp_aw.to_byte() & REG_MASK_ALL,
+               actual.to_byte() & REG_MASK_ALL, pass ? "PASS" : "FAIL");
+        if (!pass) all_pass = false;
+    }
+    {   /* SETUP_RETR */
+        auto actual = radio.read_reg(SetupRetr{});
+        bool pass = (actual.to_byte() & REG_MASK_ALL) == (exp_retr.to_byte() & REG_MASK_ALL);
+        printf("  %-10s  exp=0x%02X  got=0x%02X  [%s]\n",
+               "SETUP_RETR", exp_retr.to_byte() & REG_MASK_ALL,
+               actual.to_byte() & REG_MASK_ALL, pass ? "PASS" : "FAIL");
+        if (!pass) all_pass = false;
+    }
+    {   /* RF_CH — bit 7 is reserved, mask it out */
+        auto actual = radio.read_reg(RfCh{});
+        bool pass = (actual.to_byte() & REG_MASK_RF_CH) == (exp_rf_ch.to_byte() & REG_MASK_RF_CH);
+        printf("  %-10s  exp=0x%02X  got=0x%02X  [%s]\n",
+               "RF_CH", exp_rf_ch.to_byte() & REG_MASK_RF_CH,
+               actual.to_byte() & REG_MASK_RF_CH, pass ? "PASS" : "FAIL");
+        if (!pass) all_pass = false;
+    }
+    {   /* RF_SETUP */
+        auto actual = radio.read_reg(RfSetup{});
+        bool pass = (actual.to_byte() & REG_MASK_ALL) == (exp_rf.to_byte() & REG_MASK_ALL);
+        printf("  %-10s  exp=0x%02X  got=0x%02X  [%s]\n",
+               "RF_SETUP", exp_rf.to_byte() & REG_MASK_ALL,
+               actual.to_byte() & REG_MASK_ALL, pass ? "PASS" : "FAIL");
+        if (!pass) all_pass = false;
+    }
+    {   /* RX_PW_P0 — bits 7:6 are reserved, mask them out */
+        RxPwP0 pw0_tag;
+        auto actual = radio.read_reg(pw0_tag);
+        bool pass = (actual.to_byte() & REG_MASK_RX_PW) == (exp_pw.to_byte() & REG_MASK_RX_PW);
+        printf("  %-10s  exp=0x%02X  got=0x%02X  [%s]\n",
+               "RX_PW_P0", exp_pw.to_byte() & REG_MASK_RX_PW,
+               actual.to_byte() & REG_MASK_RX_PW, pass ? "PASS" : "FAIL");
         if (!pass) all_pass = false;
     }
 
