@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <cstdio>
 
 namespace nrf24 {
 
@@ -67,6 +68,27 @@ struct FifoStatus {
         f.rx_full  = (byte >> 1) & 0x01;
         f.rx_empty = byte & 0x01;
         return f;
+    }
+
+    /**
+     * @brief Format all FIFO_STATUS fields as a human-readable string.
+     *
+     * @code
+     *   char buf[80];
+     *   nrf24::FifoStatus fs = nrf24::FifoStatus::from_byte(0x11);
+     *   fs.format(buf, sizeof(buf));
+     *   // "tx_reuse: 0, tx_full: 0, tx_empty: 1, rx_full: 0, rx_empty: 1"
+     * @endcode
+     *
+     * @param buf  Destination buffer (recommend >= 80 bytes).
+     * @param len  Size of buf in bytes.
+     * @return     Number of characters written (excluding null terminator).
+     */
+    int format(char *buf, size_t len) const {
+        return snprintf(buf, len, "tx_reuse: %u, tx_full: %u, tx_empty: %u, rx_full: %u, rx_empty: %u",
+                        static_cast<unsigned>(tx_reuse), static_cast<unsigned>(tx_full),
+                        static_cast<unsigned>(tx_empty), static_cast<unsigned>(rx_full),
+                        static_cast<unsigned>(rx_empty));
     }
 };
 

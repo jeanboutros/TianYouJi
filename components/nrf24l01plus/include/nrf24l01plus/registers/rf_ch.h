@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <cstdio>
 
 namespace nrf24 {
 
@@ -54,6 +55,26 @@ struct RfCh {
         RfCh r;
         r.channel = byte & 0x7F;
         return r;
+    }
+
+    /**
+     * @brief Format all RF_CH fields as a human-readable string.
+     *
+     * @code
+     *   char buf[80];
+     *   nrf24::RfCh cfg = nrf24::RfCh::from_byte(0x4C);
+     *   cfg.format(buf, sizeof(buf));
+     *   // "channel: 76, freq: 2476 MHz"
+     * @endcode
+     *
+     * @param buf  Destination buffer (recommend >= 80 bytes).
+     * @param len  Size of buf in bytes.
+     * @return     Number of characters written (excluding null terminator).
+     */
+    int format(char *buf, size_t len) const {
+        return snprintf(buf, len, "channel: %u, freq: %u MHz",
+                        static_cast<unsigned>(channel),
+                        static_cast<unsigned>(2400 + channel));
     }
 };
 

@@ -127,6 +127,42 @@ public:
     void ce_low();
 
     /**
+     * @brief Write a register and verify the value was accepted by the device.
+     *
+     * Writes `value` to the register at `reg`, then immediately reads it back
+     * and compares.  Useful for debugging SPI communication issues where a
+     * write may silently fail (e.g. MOSI pin misconfigured, wrong register
+     * address, or device not responding).
+     *
+     * This is NOT the default write path — it adds a round-trip read and
+     * comparison, so should only be used during debug/validation sequences.
+     *
+     * @code
+     *   bool ok = radio.write_and_verify(nrf24::reg::CONFIG, 0x03);
+     *   // ok == true  → device accepted the write
+     *   // ok == false → read-back mismatch (SPI or write issue)
+     * @endcode
+     *
+     * @param reg    Register address (use constants from nrf24::reg::).
+     * @param value  Byte to write.
+     * @return       true if read-back matches value, false otherwise.
+     */
+    bool write_and_verify(uint8_t reg, uint8_t value);
+
+    /**
+     * @brief Write a multi-byte register and verify all bytes were accepted.
+     *
+     * Writes `data` to the register at `reg`, then reads back `len` bytes and
+     * compares each one.  Useful for validating address registers (e.g. RX_ADDR_P0).
+     *
+     * @param reg   Register address (use constants from nrf24::reg::).
+     * @param data  Pointer to bytes to write.
+     * @param len   Number of bytes (1–5 for address registers).
+     * @return      true if all read-back bytes match, false otherwise.
+     */
+    bool write_and_verify_multi(uint8_t reg, const uint8_t *data, uint8_t len);
+
+    /**
      * @brief Access the underlying HAL.
      *
      * @return Reference to the Hal implementation passed at construction.

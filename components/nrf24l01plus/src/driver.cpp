@@ -1,5 +1,6 @@
 #include "nrf24l01plus/driver.h"
 #include "nrf24l01plus/commands.h"
+#include <cstring>
 
 namespace nrf24 {
 
@@ -48,6 +49,22 @@ void Driver::ce_high()
 void Driver::ce_low()
 {
     hal_.ce_low();
+}
+
+bool Driver::write_and_verify(uint8_t reg, uint8_t value)
+{
+    write_reg(reg, value);
+    uint8_t readback = read_reg(reg);
+    return readback == value;
+}
+
+bool Driver::write_and_verify_multi(uint8_t reg, const uint8_t *data, uint8_t len)
+{
+    write_reg_multi(reg, data, len);
+    uint8_t buf[5]; // max address width is 5 bytes
+    if (len > sizeof(buf)) return false;
+    read_reg_multi(reg, buf, len);
+    return memcmp(data, buf, len) == 0;
 }
 
 } // namespace nrf24

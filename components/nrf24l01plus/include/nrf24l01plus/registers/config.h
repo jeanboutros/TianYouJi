@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <cstdio>
 
 namespace nrf24 {
 
@@ -228,6 +229,50 @@ struct Config {
         c.power_mode   = static_cast<PowerMode>((byte >> 1) & 0x01);
         c.primary      = static_cast<PrimaryMode>(byte & 0x01);
         return c;
+    }
+
+    /**
+     * @brief Format all CONFIG fields as a human-readable string.
+     *
+     * @code
+     *   char buf[96];
+     *   nrf24::Config cfg = nrf24::Config::from_byte(0x0B);
+     *   cfg.format(buf, sizeof(buf));
+     *   // "irq_mask: 0x00, crc: enabled, crc_encoding: 2 bytes, power: up, mode: RX"
+     * @endcode
+     *
+     * @param buf  Destination buffer (recommend >= 96 bytes).
+     * @param len  Size of buf in bytes.
+     * @return     Number of characters written (excluding null terminator).
+     */
+    int format(char *buf, size_t len) const {
+        const char *crc_str;
+        switch (crc_mode) {
+            case CrcMode::Disabled: crc_str = "disabled"; break;
+            case CrcMode::Enabled:  crc_str = "enabled";  break;
+            default:                 crc_str = "unknown";  break;
+        }
+        const char *enc_str;
+        switch (crc_encoding) {
+            case CrcEncoding::Bytes1: enc_str = "1 byte";  break;
+            case CrcEncoding::Bytes2: enc_str = "2 bytes"; break;
+            default:                  enc_str = "unknown";  break;
+        }
+        const char *pwr_str;
+        switch (power_mode) {
+            case PowerMode::Down: pwr_str = "down"; break;
+            case PowerMode::Up:   pwr_str = "up";   break;
+            default:              pwr_str = "unknown"; break;
+        }
+        const char *mode_str;
+        switch (primary) {
+            case PrimaryMode::TX: mode_str = "TX"; break;
+            case PrimaryMode::RX: mode_str = "RX"; break;
+            default:              mode_str = "unknown"; break;
+        }
+        return snprintf(buf, len, "irq_mask: 0x%02X, crc: %s, crc_encoding: %s, power: %s, mode: %s",
+                        static_cast<unsigned>(to_reg(irq_mask)),
+                        crc_str, enc_str, pwr_str, mode_str);
     }
 };
 

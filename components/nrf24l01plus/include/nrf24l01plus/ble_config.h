@@ -54,9 +54,8 @@ inline constexpr uint8_t ADV_ACCESS_ADDR[4] = {0x6B, 0x7D, 0x91, 0x71};
  *   cfg.scan_duration_ms = 50;
  *
  *   // Scan advertising + some data channels:
- *   uint8_t extra[] = {0, 1, 2, 12, 13};
- *   cfg.extra_channels     = extra;
- *   cfg.extra_channel_count = 5;
+ *   static constexpr uint8_t extra[] = {0, 1, 2, 12, 13};
+ *   cfg.set_extra_channels(extra);  // count deduced automatically
  * @endcode
  */
 struct RxConfig {
@@ -81,6 +80,25 @@ struct RxConfig {
     const uint8_t *extra_channels = nullptr;
 
     uint8_t extra_channel_count = 0; ///< Number of entries in extra_channels (0 = adv only)
+
+    /**
+     * @brief Set extra channels from a C array (size deduced automatically).
+     *
+     * @code
+     *   static constexpr uint8_t extra[] = {0, 1, 2, 12, 13};
+     *   nrf24::ble::RxConfig cfg;
+     *   cfg.set_extra_channels(extra);  // count deduced as 5
+     * @endcode
+     *
+     * @tparam N  Array size (deduced).
+     * @param arr  Reference to a uint8_t array of BLE channel indices.
+     */
+    template <uint8_t N>
+    constexpr void set_extra_channels(const uint8_t (&arr)[N])
+    {
+        extra_channels      = arr;
+        extra_channel_count = N;
+    }
 
     /**
      * @brief Total number of channels in the scan sequence.

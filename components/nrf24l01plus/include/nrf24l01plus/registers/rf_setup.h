@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <cstdio>
 
 namespace nrf24 {
 
@@ -298,6 +299,52 @@ struct RfSetup {
         s.pll_lock   = static_cast<PllLock>((byte >> 4) & 0x01);
         s.cont_wave  = static_cast<ContWave>((byte >> 7) & 0x01);
         return s;
+    }
+
+    /**
+     * @brief Format all RF_SETUP fields as a human-readable string.
+     *
+     * @code
+     *   char buf[96];
+     *   nrf24::RfSetup rf = nrf24::RfSetup::from_byte(0x0E);
+     *   rf.format(buf, sizeof(buf));
+     *   // "data_rate: 2 Mbps, tx_power: 0 dBm, cont_wave: disabled, pll_lock: disabled"
+     * @endcode
+     *
+     * @param buf  Destination buffer (recommend >= 96 bytes).
+     * @param len  Size of buf in bytes.
+     * @return     Number of characters written (excluding null terminator).
+     */
+    int format(char *buf, size_t len) const {
+        const char *dr_str;
+        switch (data_rate) {
+            case DataRate::Mbps1:   dr_str = "1 Mbps";   break;
+            case DataRate::Mbps2:   dr_str = "2 Mbps";   break;
+            case DataRate::Kbps250: dr_str = "250 kbps"; break;
+            default:                dr_str = "unknown";   break;
+        }
+        const char *pwr_str;
+        switch (tx_power) {
+            case TxPower::Minus18dBm: pwr_str = "-18 dBm"; break;
+            case TxPower::Minus12dBm: pwr_str = "-12 dBm"; break;
+            case TxPower::Minus6dBm:  pwr_str = "-6 dBm";  break;
+            case TxPower::dBm0:       pwr_str = "0 dBm";   break;
+            default:                  pwr_str = "unknown";  break;
+        }
+        const char *cw_str;
+        switch (cont_wave) {
+            case ContWave::Disabled: cw_str = "disabled"; break;
+            case ContWave::Enabled:  cw_str = "enabled";  break;
+            default:                  cw_str = "unknown";  break;
+        }
+        const char *pll_str;
+        switch (pll_lock) {
+            case PllLock::Disabled: pll_str = "disabled"; break;
+            case PllLock::Enabled:  pll_str = "enabled";  break;
+            default:                pll_str = "unknown";  break;
+        }
+        return snprintf(buf, len, "data_rate: %s, tx_power: %s, cont_wave: %s, pll_lock: %s",
+                        dr_str, pwr_str, cw_str, pll_str);
     }
 };
 

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <cstdio>
 
 namespace nrf24 {
 
@@ -63,6 +64,26 @@ struct EnAa {
             aa.pipe[i] = (byte >> i) & 0x01;
         }
         return aa;
+    }
+
+    /**
+     * @brief Format all EN_AA fields as a human-readable string.
+     *
+     * @code
+     *   char buf[80];
+     *   nrf24::EnAa aa = nrf24::EnAa::from_byte(0x3F);
+     *   aa.format(buf, sizeof(buf));
+     *   // "pipe[0..5]: 1/1/1/1/1/1"
+     * @endcode
+     *
+     * @param buf  Destination buffer (recommend >= 80 bytes).
+     * @param len  Size of buf in bytes.
+     * @return     Number of characters written (excluding null terminator).
+     */
+    int format(char *buf, size_t len) const {
+        return snprintf(buf, len, "pipe[0..5]: %d/%d/%d/%d/%d/%d",
+                        pipe[0], pipe[1], pipe[2],
+                        pipe[3], pipe[4], pipe[5]);
     }
 };
 

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <cstdio>
 
 namespace nrf24 {
 
@@ -91,6 +92,33 @@ struct SetupAw {
         SetupAw s;
         s.address_width = static_cast<AddressWidth>(byte & 0x03);
         return s;
+    }
+
+    /**
+     * @brief Format the SETUP_AW field as a human-readable string.
+     *
+     * @code
+     *   char buf[80];
+     *   nrf24::SetupAw aw = nrf24::SetupAw::from_byte(0x03);
+     *   aw.format(buf, sizeof(buf));
+     *   // "address_width: 3 (5 bytes)"
+     * @endcode
+     *
+     * @param buf  Destination buffer (recommend >= 80 bytes).
+     * @param len  Size of buf in bytes.
+     * @return     Number of characters written (excluding null terminator).
+     */
+    int format(char *buf, size_t len) const {
+        const char *aw_str;
+        switch (address_width) {
+            case AddressWidth::Bytes3: aw_str = "3 bytes"; break;
+            case AddressWidth::Bytes4: aw_str = "4 bytes"; break;
+            case AddressWidth::Bytes5: aw_str = "5 bytes"; break;
+            default:                   aw_str = "unknown"; break;
+        }
+        return snprintf(buf, len, "address_width: %u (%s)",
+                        static_cast<unsigned>(static_cast<uint8_t>(address_width)),
+                        aw_str);
     }
 };
 

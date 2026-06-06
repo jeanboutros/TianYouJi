@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <cstdio>
 
 namespace nrf24 {
 
@@ -56,6 +57,26 @@ struct ObserveTx {
         o.plos_cnt = (byte >> 4) & 0x0F;
         o.arc_cnt  = byte & 0x0F;
         return o;
+    }
+
+    /**
+     * @brief Format all OBSERVE_TX fields as a human-readable string.
+     *
+     * @code
+     *   char buf[80];
+     *   nrf24::ObserveTx obs = nrf24::ObserveTx::from_byte(0x52);
+     *   obs.format(buf, sizeof(buf));
+     *   // "plos_cnt: 5, arc_cnt: 2"
+     * @endcode
+     *
+     * @param buf  Destination buffer (recommend >= 80 bytes).
+     * @param len  Size of buf in bytes.
+     * @return     Number of characters written (excluding null terminator).
+     */
+    int format(char *buf, size_t len) const {
+        return snprintf(buf, len, "plos_cnt: %u, arc_cnt: %u",
+                        static_cast<unsigned>(plos_cnt),
+                        static_cast<unsigned>(arc_cnt));
     }
 };
 

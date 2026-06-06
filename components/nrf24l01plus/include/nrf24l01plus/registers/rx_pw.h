@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <cstdio>
 
 namespace nrf24 {
 
@@ -77,6 +78,24 @@ struct RxPw {
      */
     static constexpr RxPw from_byte(uint8_t byte) {
         return RxPw{static_cast<uint8_t>(byte & 0x3F)};
+    }
+
+    /**
+     * @brief Format the payload width field as a human-readable string.
+     *
+     * @code
+     *   char buf[80];
+     *   nrf24::RxPw pw = nrf24::RxPw::from_byte(0x10);
+     *   pw.format(buf, sizeof(buf));
+     *   // "payload_width: 16"
+     * @endcode
+     *
+     * @param buf  Destination buffer (recommend >= 80 bytes).
+     * @param len  Size of buf in bytes.
+     * @return     Number of characters written (excluding null terminator).
+     */
+    int format(char *buf, size_t len) const {
+        return snprintf(buf, len, "payload_width: %u", static_cast<unsigned>(payload_width));
     }
 };
 

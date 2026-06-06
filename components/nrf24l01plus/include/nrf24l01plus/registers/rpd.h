@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <cstdio>
 
 namespace nrf24 {
 
@@ -58,6 +59,26 @@ struct Rpd {
         Rpd r;
         r.received_power = byte & 0x01;
         return r;
+    }
+
+    /**
+     * @brief Format the RPD field as a human-readable string.
+     *
+     * @code
+     *   char buf[80];
+     *   nrf24::Rpd rpd = nrf24::Rpd::from_byte(0x01);
+     *   rpd.format(buf, sizeof(buf));
+     *   // "received_power: 1 (above -64 dBm)"
+     * @endcode
+     *
+     * @param buf  Destination buffer (recommend >= 80 bytes).
+     * @param len  Size of buf in bytes.
+     * @return     Number of characters written (excluding null terminator).
+     */
+    int format(char *buf, size_t len) const {
+        return snprintf(buf, len, "received_power: %u (%s)",
+                        static_cast<unsigned>(received_power),
+                        received_power ? "above -64 dBm" : "below -64 dBm");
     }
 };
 

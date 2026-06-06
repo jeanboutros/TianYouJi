@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <cstdio>
 
 namespace nrf24 {
 
@@ -128,6 +129,43 @@ struct Feature {
         f.en_ack_pay = static_cast<AckPayMode>((byte >> 1) & 0x01);
         f.en_dyn_ack = static_cast<DynAckMode>(byte & 0x01);
         return f;
+    }
+
+    /**
+     * @brief Format all FEATURE fields as a human-readable string.
+     *
+     * @code
+     *   char buf[80];
+     *   nrf24::Feature feat = nrf24::Feature::from_byte(0x07);
+     *   feat.format(buf, sizeof(buf));
+     *   // "en_dpl: enabled, en_ack_pay: enabled, en_dyn_ack: enabled"
+     * @endcode
+     *
+     * @param buf  Destination buffer (recommend >= 80 bytes).
+     * @param len  Size of buf in bytes.
+     * @return     Number of characters written (excluding null terminator).
+     */
+    int format(char *buf, size_t len) const {
+        const char *dpl_str;
+        switch (en_dpl) {
+            case DplMode::Disabled: dpl_str = "disabled"; break;
+            case DplMode::Enabled:   dpl_str = "enabled";  break;
+            default:                 dpl_str = "unknown";  break;
+        }
+        const char *ack_str;
+        switch (en_ack_pay) {
+            case AckPayMode::Disabled: ack_str = "disabled"; break;
+            case AckPayMode::Enabled:  ack_str = "enabled";  break;
+            default:                   ack_str = "unknown";  break;
+        }
+        const char *dyn_str;
+        switch (en_dyn_ack) {
+            case DynAckMode::Disabled: dyn_str = "disabled"; break;
+            case DynAckMode::Enabled:  dyn_str = "enabled";  break;
+            default:                   dyn_str = "unknown";  break;
+        }
+        return snprintf(buf, len, "en_dpl: %s, en_ack_pay: %s, en_dyn_ack: %s",
+                        dpl_str, ack_str, dyn_str);
     }
 };
 

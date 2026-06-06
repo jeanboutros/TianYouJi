@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <cstdio>
 
 namespace nrf24 {
 
@@ -163,6 +164,64 @@ struct SetupRetr {
         s.delay = static_cast<AutoRetransmitDelay>((byte >> 4) & 0x0F);
         s.count = static_cast<AutoRetransmitCount>(byte & 0x0F);
         return s;
+    }
+
+    /**
+     * @brief Format all SETUP_RETR fields as a human-readable string.
+     *
+     * @code
+     *   char buf[80];
+     *   nrf24::SetupRetr sr = nrf24::SetupRetr::from_byte(0x93);
+     *   sr.format(buf, sizeof(buf));
+     *   // "delay: 2500 us, count: 3"
+     * @endcode
+     *
+     * @param buf  Destination buffer (recommend >= 80 bytes).
+     * @param len  Size of buf in bytes.
+     * @return     Number of characters written (excluding null terminator).
+     */
+    int format(char *buf, size_t len) const {
+        const char *delay_str;
+        switch (delay) {
+            case AutoRetransmitDelay::Us250:  delay_str = "250 us";  break;
+            case AutoRetransmitDelay::Us500:  delay_str = "500 us";  break;
+            case AutoRetransmitDelay::Us750:  delay_str = "750 us";  break;
+            case AutoRetransmitDelay::Us1000: delay_str = "1000 us"; break;
+            case AutoRetransmitDelay::Us1250: delay_str = "1250 us"; break;
+            case AutoRetransmitDelay::Us1500: delay_str = "1500 us"; break;
+            case AutoRetransmitDelay::Us1750: delay_str = "1750 us"; break;
+            case AutoRetransmitDelay::Us2000: delay_str = "2000 us"; break;
+            case AutoRetransmitDelay::Us2250: delay_str = "2250 us"; break;
+            case AutoRetransmitDelay::Us2500: delay_str = "2500 us"; break;
+            case AutoRetransmitDelay::Us2750: delay_str = "2750 us"; break;
+            case AutoRetransmitDelay::Us3000: delay_str = "3000 us"; break;
+            case AutoRetransmitDelay::Us3250: delay_str = "3250 us"; break;
+            case AutoRetransmitDelay::Us3500: delay_str = "3500 us"; break;
+            case AutoRetransmitDelay::Us3750: delay_str = "3750 us"; break;
+            case AutoRetransmitDelay::Us4000: delay_str = "4000 us"; break;
+            default:                           delay_str = "unknown"; break;
+        }
+        const char *count_str;
+        switch (count) {
+            case AutoRetransmitCount::Disabled: count_str = "disabled"; break;
+            case AutoRetransmitCount::Count1:   count_str = "1";       break;
+            case AutoRetransmitCount::Count2:   count_str = "2";       break;
+            case AutoRetransmitCount::Count3:   count_str = "3";       break;
+            case AutoRetransmitCount::Count4:   count_str = "4";       break;
+            case AutoRetransmitCount::Count5:   count_str = "5";       break;
+            case AutoRetransmitCount::Count6:   count_str = "6";       break;
+            case AutoRetransmitCount::Count7:   count_str = "7";       break;
+            case AutoRetransmitCount::Count8:   count_str = "8";       break;
+            case AutoRetransmitCount::Count9:   count_str = "9";       break;
+            case AutoRetransmitCount::Count10:  count_str = "10";      break;
+            case AutoRetransmitCount::Count11:  count_str = "11";      break;
+            case AutoRetransmitCount::Count12:  count_str = "12";      break;
+            case AutoRetransmitCount::Count13:  count_str = "13";      break;
+            case AutoRetransmitCount::Count14:  count_str = "14";      break;
+            case AutoRetransmitCount::Count15:  count_str = "15";      break;
+            default:                            count_str = "unknown";  break;
+        }
+        return snprintf(buf, len, "delay: %s, count: %s", delay_str, count_str);
     }
 };
 
