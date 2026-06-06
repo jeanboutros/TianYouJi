@@ -3,6 +3,7 @@
 #include <cstdint>
 #include "nrf24l01plus/driver.h"
 #include "nrf24l01plus/ble_config.h"
+#include "nrf24l01plus/diag_boot.h"
 
 namespace nrf24 {
 namespace diag {
@@ -13,6 +14,10 @@ namespace diag {
  * Reads back all registers programmed by nrf24::ble::configure_rx() and
  * compares them against expected values derived from the given RxConfig.
  * Results are printed to stdout.
+ *
+ * @deprecated Use full_boot_diagnostic() or verify_ble_config() instead.
+ *   The structured diagnostics module (diag_boot.h) provides typed results,
+ *   per-phase status, and automatic retry handling.
  *
  * @code
  *   nrf24::Driver radio(hal);
@@ -48,6 +53,10 @@ bool verify_ble_rx(Driver &radio, const ble::RxConfig &config = {});
  * Must be called BEFORE nrf24::ble::configure_rx() so that POR values
  * are still intact.  After this function returns, EN_AA is left at 0x00
  * (as a side effect of the clone test).
+ *
+ * @deprecated Use full_boot_diagnostic() or verify_spi_comm() instead.
+ *   The structured diagnostics module (diag_boot.h) provides typed results,
+ *   per-phase status, and automatic retry handling.
  *
  * @code
  *   nrf24::EspIdfHal hal;

@@ -64,6 +64,20 @@ public:
     void delay_us(uint32_t us) override;
 
     /**
+     * @brief Read the current logic level of the CE GPIO pin.
+     *
+     * @return 1 if CE pin is HIGH, 0 if LOW.
+     */
+    int ce_read() const override;
+
+    /**
+     * @brief Return a monotonic timestamp in microseconds.
+     *
+     * @return Current timestamp in microseconds (monotonic).
+     */
+    int64_t timestamp_us() const override;
+
+    /**
      * @brief Get the MOSI pin number (for platform-specific post-init control).
      *
      * @return The GPIO number configured for MOSI.

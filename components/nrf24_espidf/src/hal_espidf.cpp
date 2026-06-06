@@ -1,6 +1,7 @@
 #include "nrf24_espidf/hal_espidf.h"
 #include "esp_check.h"
 #include "esp_rom_sys.h"
+#include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include <cstring>
@@ -109,6 +110,32 @@ void EspIdfHal::delay_ms(uint32_t ms)
 void EspIdfHal::delay_us(uint32_t us)
 {
     esp_rom_delay_us(us);
+}
+
+/**
+ * @brief Read the current logic level of the CE GPIO pin.
+ *
+ * Uses gpio_get_level() which requires the input buffer to be
+ * enabled (GPIO_MODE_INPUT_OUTPUT set during init()).
+ *
+ * @return 1 if CE pin is HIGH, 0 if LOW.
+ */
+int EspIdfHal::ce_read() const
+{
+    return gpio_get_level(ce_pin_);
+}
+
+/**
+ * @brief Return a monotonic timestamp in microseconds.
+ *
+ * Uses esp_timer_get_time() which returns microseconds since boot.
+ * The value is monotonic and suitable for measuring intervals.
+ *
+ * @return Current timestamp in microseconds (monotonic).
+ */
+int64_t EspIdfHal::timestamp_us() const
+{
+    return esp_timer_get_time();
 }
 
 } // namespace nrf24

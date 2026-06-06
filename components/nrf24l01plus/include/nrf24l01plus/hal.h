@@ -94,6 +94,42 @@ public:
      *            platform's busy-wait timer resolution.
      */
     virtual void delay_us(uint32_t us) = 0;
+
+    /**
+     * @brief Read the current logic level of the CE GPIO pin.
+     *
+     * Returns 1 if the pin is HIGH, 0 if LOW.  The implementation must
+     * have the input buffer enabled (e.g. GPIO_MODE_INPUT_OUTPUT on
+     * ESP32) for this to return meaningful values.
+     *
+     * Used by diagnostic phases to verify that ce_high()/ce_low()
+     * actually changed the physical pin state.
+     *
+     * @return 1 if CE pin is HIGH, 0 if LOW.
+     */
+    virtual int ce_read() const = 0;
+
+    /**
+     * @brief Return a monotonic timestamp in microseconds.
+     *
+     * Used by diagnostic phases to measure CE transition timing and
+     * phase execution duration.  The epoch is arbitrary; only differences
+     * between successive calls are meaningful.
+     *
+     * @return Current timestamp in microseconds (monotonic).
+     */
+    virtual int64_t timestamp_us() const = 0;
+
+    /**
+     * @brief Yield the CPU for the specified number of milliseconds.
+     *
+     * Semantic equivalent of delay_ms() — intended for human-scale waits
+     * (retry delays, poll intervals) rather than nRF24 microsecond timing.
+     * The default implementation delegates to delay_ms().
+     *
+     * @param ms  Duration in milliseconds.
+     */
+    void sleep_ms(uint32_t ms) { delay_ms(ms); }
 };
 
 } // namespace nrf24
