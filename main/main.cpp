@@ -31,17 +31,8 @@ static constexpr gpio_num_t PIN_SCLK = GPIO_NUM_18;
 static constexpr gpio_num_t PIN_CSN  = GPIO_NUM_17;
 static constexpr gpio_num_t PIN_CE   = GPIO_NUM_5;
 
-/* BLE PDU header masks (Bluetooth Core Spec Vol 6 Part B §2.1) */
-static constexpr uint8_t BLE_PDU_TYPE_MASK   = 0x0F; ///< Bits [3:0] of PDU header byte 0
-static constexpr uint8_t BLE_PDU_LENGTH_MASK = 0x3F; ///< Bits [5:0] of PDU header byte 1
-
 /** @brief Maximum nRF24L01+ payload size in bytes (FIFO width, not BLE PDU limit). */
 static constexpr uint8_t NRF24_MAX_PAYLOAD = 32;
-
-/* PDU type names (lower 4 bits of PDU header byte 0)                 */
-static const char *pdu_type_names[] = {
-    "ADV_IND", "ADV_DIRECT_IND", "ADV_NONCONN_IND", "SCAN_REQ",
-    "SCAN_RSP", "CONNECT_IND", "ADV_SCAN_IND", "UNKNOWN"};
 
 static nrf24::EspIdfHal hal;
 static nrf24::Driver radio(hal);
@@ -188,14 +179,48 @@ static void ble_sniffer_task(void *arg)
 
                 nrf24::ble::dewhiten(buf, NRF24_MAX_PAYLOAD, ble_ch);
 
-                uint8_t pdu_type = buf[0] & BLE_PDU_TYPE_MASK;
-                uint8_t pdu_len = buf[1] & BLE_PDU_LENGTH_MASK;
-                const char *type = pdu_type_names[pdu_type < 7 ? pdu_type : 7];
+                auto pdu_type = static_cast<nrf24::ble::BleAdvPduType>(
+                    buf[0] & nrf24::ble::PDU_TYPE_MASK);
+                uint8_t pdu_len = buf[1] & nrf24::ble::PDU_LENGTH_MASK;
+                const char *type_name = nrf24::ble::pdu_type_name(pdu_type);
 
                 printf("[ch%u] %-17s  %02X:%02X:%02X:%02X:%02X:%02X  len=%u\n",
-                       ble_ch, type,
+                       ble_ch, type_name,
                        buf[7], buf[6], buf[5], buf[4], buf[3], buf[2],
                        pdu_len);
+
+                /* For ADV_EXT_IND (BLE 5.0+), print extended header info.
+                 * Per Bluetooth Core Spec Vol 6 Part B §2.3.3:
+                 *   PDU body starts at buf[2], first byte is Extended Header
+                 *   Length, second byte is Extended Header flags.
+                 * The nRF24's 32-byte payload may only capture the start
+                 * of a long extended advertising PDU — print what we have. */
+                if (pdu_type == nrf24::ble::BleAdvPduType::AdvExtInd)
+                {
+                    if (pdu_len >= 2 && pdu_len + 2 <= NRF24_MAX_PAYLOAD)
+                    {
+                        uint8_t ext_hdr_len = buf[2];
+                        uint8_t ext_hdr_flags = buf[3];
+                        printf("  ext_hdr: len=%u flags=0x%02X  (AdvMode=%u)\n",
+                               static_cast<unsigned>(ext_hdr_len),
+                               static_cast<unsigned>(ext_hdr_flags),
+                               static_cast<unsigned>((buf[0] >> 6) & 0x03));
+                    }
+                    else
+                    {
+                        printf("  ext_hdr: [truncated — pdu_len=%u, capture=%u]\n",
+                               pdu_len, NRF24_MAX_PAYLOAD);
+                    }
+                }
+
+                /* For unknown PDU types, include the type code and length
+                 * in the output to aid identification per spec lookup. */
+                if (static_cast<uint8_t>(pdu_type) > 7)
+                {
+                    printf("  note: reserved PDU type code %u, len=%u\n",
+                           static_cast<unsigned>(pdu_type),
+                           static_cast<unsigned>(pdu_len));
+                }
 
                 uint8_t print_len = (pdu_len + 2 <= NRF24_MAX_PAYLOAD) ? pdu_len + 2 : NRF24_MAX_PAYLOAD;
                 printf("  pdu:");

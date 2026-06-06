@@ -78,5 +78,63 @@ inline uint8_t swapbits(uint8_t v)
  */
 void dewhiten(uint8_t *data, uint8_t len, uint8_t channel_idx);
 
+/**
+ * @brief BLE advertising physical channel PDU type codes.
+ *
+ * Per Bluetooth Core Spec Vol 6 Part B §2.3 Table 2.2.
+ * Values 0–7 are defined by the spec; values 8–15 are reserved
+ * and should not appear on the advertising physical channel.
+ * The underlying type is uint8_t so that raw PDU header values
+ * (4 bits wide) can be cast without narrowing.
+ *
+ * @code
+ *   uint8_t raw = buf[0] & 0x0F;
+ *   auto pdu_type = static_cast<nrf24::ble::BleAdvPduType>(raw);
+ *   if (pdu_type == nrf24::ble::BleAdvPduType::AdvExtInd) {
+ *       // BLE 5.0+ extended advertising — decode extended header
+ *   }
+ * @endcode
+ */
+enum class BleAdvPduType : uint8_t {
+    AdvInd        = 0,  ///< Connectable undirected advertising
+    AdvDirectInd  = 1,  ///< Connectable directed advertising
+    AdvNonconnInd = 2,  ///< Non-connectable undirected advertising
+    ScanReq       = 3,  ///< Scan request
+    ScanRsp       = 4,  ///< Scan response
+    ConnectInd    = 5,  ///< Connection indication
+    AdvScanInd    = 6,  ///< Scannable undirected advertising
+    AdvExtInd     = 7,  ///< Extended advertising (BLE 5.0+)
+    /* Values 8–15 are reserved per Bluetooth Core Spec Vol 6 Part B §2.3 */
+};
+
+/**
+ * @brief BLE PDU header bit masks (Bluetooth Core Spec Vol 6 Part B §2.1).
+ *
+ * @code
+ *   uint8_t pdu_type = buf[0] & nrf24::ble::PDU_TYPE_MASK;   // bits [3:0]
+ *   uint8_t pdu_len  = buf[1] & nrf24::ble::PDU_LENGTH_MASK; // bits [5:0]
+ * @endcode
+ */
+static constexpr uint8_t PDU_TYPE_MASK   = 0x0F; ///< Bits [3:0] of PDU header byte 0
+static constexpr uint8_t PDU_LENGTH_MASK = 0x3F; ///< Bits [5:0] of PDU header byte 1
+
+/**
+ * @brief Return the spec-defined name for a BLE advertising PDU type.
+ *
+ * For known types (0–7), returns the spec name (e.g. "ADV_EXT_IND").
+ * For reserved types (8–15), returns "UNKNOWN(type=N)" where N is
+ * the numeric type code.
+ *
+ * @code
+ *   nrf24::ble::pdu_type_name(nrf24::ble::BleAdvPduType::AdvInd)     // "ADV_IND"
+ *   nrf24::ble::pdu_type_name(nrf24::ble::BleAdvPduType::AdvExtInd)  // "ADV_EXT_IND"
+ *   nrf24::ble::pdu_type_name(static_cast<nrf24::ble::BleAdvPduType>(9))  // "UNKNOWN(type=9)"
+ * @endcode
+ *
+ * @param t  PDU type code (typically from bits [3:0] of the PDU header).
+ * @return   Null-terminated spec name or "UNKNOWN(type=N)" string.
+ */
+const char *pdu_type_name(BleAdvPduType t);
+
 } // namespace ble
 } // namespace nrf24
