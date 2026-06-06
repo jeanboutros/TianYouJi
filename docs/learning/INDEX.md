@@ -15,6 +15,9 @@
 - [Passive spectrum scan: RPD register, channel energy map](nrf24-spectrum-scan.md)
 - [BLE packet crafting: raw ADV_NONCONN_IND from NRF24](nrf24-ble-packet-crafting.md)
 
+## BLE Protocol
+- [Data whitening on nRF24L01+: bugs found, correct Galois LFSR, seed derivation](ble-data-whitening-nrf24.md)
+
 ## BLE (ESP32 Bluetooth Stack)
 - [BLE advertising with ESP-IDF: GAP API, non-connectable beacons](ble-advertising-esp32.md)
 
