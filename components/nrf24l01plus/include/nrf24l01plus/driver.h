@@ -42,48 +42,56 @@ public:
      *              from nrf24l01plus/registers/addresses.h (e.g. nrf24::reg::TX_ADDR).
      * @param data  Pointer to bytes to write (LSByte first per nRF24 convention).
      * @param len   Number of bytes (1-5 for address registers).
+     * @return      true if the SPI transfer succeeded, false on SPI failure.
      */
-    void write_reg_multi(uint8_t reg, const uint8_t *data, uint8_t len);
+    bool write_reg_multi(uint8_t reg, const uint8_t *data, uint8_t len);
 
     /**
      * @brief Read a multi-byte register.
      *
      * Sends R_REGISTER followed by `len` clock bytes, storing MISO data
-     * into `buf`.
+     * into `buf`.  On SPI failure, `buf` contents are undefined.
      *
      * @param reg  Register address (only bits [4:0] used).  Use constants
      *              from nrf24l01plus/registers/addresses.h (e.g. nrf24::reg::RX_ADDR_P0).
      * @param buf  Destination buffer (must be >= len bytes).
      * @param len  Number of bytes to read.
+     * @return     true if the SPI transfer succeeded, false on SPI failure.
      */
-    void read_reg_multi(uint8_t reg, uint8_t *buf, uint8_t len);
+    bool read_reg_multi(uint8_t reg, uint8_t *buf, uint8_t len);
 
     /**
      * @brief Read the RX payload from the FIFO.
      *
      * Sends the R_RX_PAYLOAD command (cmd::R_RX_PAYLOAD) and clocks out
      * `len` bytes.  The payload is removed from the RX FIFO after reading.
+     * On SPI failure, `buf` contents are undefined.
      *
      * @param buf  Destination buffer (must be >= len bytes).
      * @param len  Number of payload bytes to read (1-32).
+     * @return     true if the SPI transfer succeeded, false on SPI failure.
      */
-    void read_payload(uint8_t *buf, uint8_t len);
+    bool read_payload(uint8_t *buf, uint8_t len);
 
     /**
      * @brief Flush the RX FIFO.
      *
      * Sends the FLUSH_RX command (cmd::FLUSH_RX).  Should be used in RX mode
      * only; behaviour is undefined in TX mode per the datasheet.
+     *
+     * @return true if the SPI transfer succeeded, false on SPI failure.
      */
-    void flush_rx();
+    bool flush_rx();
 
     /**
      * @brief Flush the TX FIFO.
      *
      * Sends the FLUSH_TX command (cmd::FLUSH_TX).  Should be used in TX mode
      * only; behaviour is undefined in RX mode per the datasheet.
+     *
+     * @return true if the SPI transfer succeeded, false on SPI failure.
      */
-    void flush_tx();
+    bool flush_tx();
 
     /**
      * @brief Drive CE pin high (activate RX or start TX).
@@ -188,8 +196,10 @@ private:
      * Used internally by the typed template overload to access the SPI layer.
      * Prefer the typed overload read_reg(StructType{}) for all external code.
      *
+     * On SPI failure, returns 0xFF (the "no device" sentinel: MISO stuck high).
+     *
      * @param reg  Register address (only bits [4:0] used).
-     * @return     The byte value read from the register.
+     * @return     The byte value read from the register, or 0xFF on SPI failure.
      */
     uint8_t read_reg(uint8_t reg);
 
@@ -201,8 +211,9 @@ private:
      *
      * @param reg    Register address (only bits [4:0] used).
      * @param value  Byte to write into the register.
+     * @return       true if the SPI transfer succeeded, false on SPI failure.
      */
-    void write_reg(uint8_t reg, uint8_t value);
+    bool write_reg(uint8_t reg, uint8_t value);
 
     /**
      * @brief Write and verify a single-byte register (internal, address by raw uint8_t).
@@ -230,13 +241,18 @@ StructType Driver::read_reg(StructType)
 template <typename StructType>
 void Driver::write_reg(const StructType &reg_struct)
 {
-    write_reg(StructType::ADDRESS, reg_struct.to_byte());
+    /* SPI write failures are extremely rare and will be caught by
+     * write_and_verify() or diagnostic readback checks.  The typed
+     * void overload deliberately discards the spi_xfer result —
+     * callers who need error propagation should use write_and_verify().
+     */
+    (void)write_reg(StructType::ADDRESS, reg_struct.to_byte());
 }
 
 template <typename StructType>
 bool Driver::write_and_verify(const StructType &reg_struct)
 {
-    write_reg(StructType::ADDRESS, reg_struct.to_byte());
+    if (!write_reg(StructType::ADDRESS, reg_struct.to_byte())) return false;
     auto readback = StructType::from_byte(read_reg(StructType::ADDRESS));
     return readback.to_byte() == reg_struct.to_byte();
 }

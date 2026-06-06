@@ -1,5 +1,5 @@
 #include "nrf24_espidf/hal_espidf.h"
-#include "esp_check.h"
+#include "esp_log.h"
 #include "esp_rom_sys.h"
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
@@ -10,8 +10,9 @@ namespace nrf24 {
 
 void EspIdfHal::init(const EspIdfPins &pins)
 {
-    ce_pin_   = pins.ce;
-    mosi_pin_ = pins.mosi;
+    ce_pin_    = pins.ce;
+    mosi_pin_  = pins.mosi;
+    spi_host_  = pins.spi_host;
 
     /* SPI bus */
     spi_bus_config_t bus_cfg = {};
@@ -57,9 +58,23 @@ void EspIdfHal::init(const EspIdfPins &pins)
     };
     gpio_config(&gpio_cfg);
     gpio_set_level(pins.ce, 0);
+
+    initialized_ = true;
 }
 
-void EspIdfHal::spi_xfer(uint8_t cmd, const uint8_t *tx, uint8_t *rx, uint8_t len)
+EspIdfHal::~EspIdfHal()
+{
+    if (initialized_) {
+        if (spi_handle_) {
+            spi_bus_remove_device(spi_handle_);
+            spi_handle_ = nullptr;
+        }
+        spi_bus_free(spi_host_);
+        initialized_ = false;
+    }
+}
+
+bool EspIdfHal::spi_xfer(uint8_t cmd, const uint8_t *tx, uint8_t *rx, uint8_t len)
 {
     spi_transaction_t t = {};
     t.cmd    = cmd;
@@ -85,11 +100,18 @@ void EspIdfHal::spi_xfer(uint8_t cmd, const uint8_t *tx, uint8_t *rx, uint8_t le
         t.rx_buffer = rx;
     }
 
-    ESP_ERROR_CHECK(spi_device_polling_transmit(spi_handle_, &t));
+    esp_err_t ret = spi_device_polling_transmit(spi_handle_, &t);
+    if (ret != ESP_OK) {
+        ESP_LOGW("EspIdfHal", "SPI transfer failed: cmd=0x%02X len=%u ret=%d",
+                 static_cast<unsigned>(cmd), static_cast<unsigned>(len), ret);
+        return false;
+    }
 
     if (rx && (t.flags & SPI_TRANS_USE_RXDATA) && len <= 4) {
         memcpy(rx, t.rx_data, len);
     }
+
+    return true;
 }
 
 void EspIdfHal::ce_high()

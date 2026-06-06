@@ -443,12 +443,10 @@ The project now uses `nrf24::diag::full_boot_diagnostic()` (in `diag_boot.h`) in
 
 The old `verify_spi_comm()` and `verify_ble_rx()` functions are still available as backward-compatible wrappers but are marked `@deprecated` in favor of `full_boot_diagnostic()`.
 
-### Known issue: ESP_ERROR_CHECK in spi_xfer()
+### Resolved: Hal::spi_xfer() now returns bool (was F-1)
 
-**Severity: HIGH** (Phase C security reviewer finding F-1)
+Previously, `EspIdfHal::spi_xfer()` used `ESP_ERROR_CHECK()` on `spi_device_polling_transmit()`, which called `abort()` on any SPI transfer failure. This defeated the diagnostic retry architecture.
 
-`EspIdfHal::spi_xfer()` uses `ESP_ERROR_CHECK()` on `spi_device_polling_transmit()`, which calls `abort()` on any SPI transfer failure. This defeats the diagnostic retry architecture — a transient SPI error should be propagated as `false` so the caller can retry, not crash the entire firmware.
+**Fix applied:** `Hal::spi_xfer()` now returns `bool` (true = success, false = failure). `EspIdfHal::spi_xfer()` returns `false` on SPI errors instead of calling `abort()`. All `Driver` methods propagate the error: `read_reg(uint8_t)` returns `0xFF` on failure, `write_reg()`/`write_reg_multi()`/`read_reg_multi()`/`read_payload()`/`flush_rx()`/`flush_tx()` return `bool`. The typed template overloads (`read_reg<T>()`, `write_reg<T>()`) retain their original void/T return types for API stability.
 
-**Required fix**: Change `Hal::spi_xfer()` from `void` to return `bool`, propagate the result through all `Driver` methods, and update all callers in `main.cpp` and `diag_boot.cpp`. The `EspIdfHal` implementation should return `false` on SPI errors instead of aborting.
-
-This is tracked in `docs/pipeline/TODO.md` Backlog.
+`EspIdfHal` also now has an RAII destructor that removes the SPI device and frees the SPI bus when `init()` was called (was F-4).

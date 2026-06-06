@@ -221,9 +221,8 @@ extern "C" void app_main(void)
     printf("NRF24L01 driver initialized\n");
 
     /* Run structured boot diagnostics (SPI, BLE config, CE state, extended test).
-     * Replaces the former ad-hoc spi_comm_test + verify_ble_rx + print_register_diagnostics
-     * sequence, plus the BLE_DIAG-gated CE tests.  If diagnostics fail after max retries,
-     * enter deep sleep for 60 seconds and restart (decision D-1). */
+     * If diagnostics fail after max retries, enter deep sleep for 60 seconds
+     * and restart (decision D-1). */
     nrf24::diag::DiagOpts opts;
     opts.verbosity         = nrf24::diag::DiagVerbosity::Detailed;
     opts.retry_count       = 3;

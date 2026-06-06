@@ -34,12 +34,14 @@ struct EspIdfPins {
 class EspIdfHal final : public Hal {
 public:
     /**
-     * @brief Destructor — defaulted to allow safe deletion via Hal pointer.
+     * @brief Destructor — removes the SPI device and frees the SPI bus.
      *
-     * The base Hal destructor is virtual, so destroying through a base
-     * pointer correctly invokes the derived destructor.
+     * If init() was called, removes the SPI device handle.  The SPI bus
+     * is freed only if spi_host_ is valid, which requires init() to have
+     * stored it.  Safe to call on an uninitialised instance (spi_handle_
+     * is null, spi_host_ is unset).
      */
-    ~EspIdfHal() override = default;
+    ~EspIdfHal() override;
 
     /**
      * @brief Initialise the SPI bus, device, and CE GPIO.
@@ -48,7 +50,7 @@ public:
      */
     void init(const EspIdfPins &pins);
 
-    void spi_xfer(uint8_t cmd, const uint8_t *tx, uint8_t *rx, uint8_t len) override;
+    bool spi_xfer(uint8_t cmd, const uint8_t *tx, uint8_t *rx, uint8_t len) override;
     void ce_high() override;
     void ce_low() override;
     void delay_ms(uint32_t ms) override;
@@ -100,8 +102,10 @@ public:
 
 private:
     spi_device_handle_t spi_handle_{};
+    spi_host_device_t spi_host_{}; ///< SPI host used for bus initialisation (needed for cleanup)
     gpio_num_t ce_pin_{};
     gpio_num_t mosi_pin_{};
+    bool initialized_ = false; ///< True after init() has been called successfully
 };
 
 } // namespace nrf24

@@ -19,7 +19,7 @@ namespace nrf24 {
  *   // Example: ESP-IDF implementation sketch
  *   class EspIdfHal : public nrf24::Hal {
  *   public:
- *       void spi_xfer(uint8_t cmd, const uint8_t* tx, uint8_t* rx, uint8_t len) override;
+ *       bool spi_xfer(uint8_t cmd, const uint8_t* tx, uint8_t* rx, uint8_t len) override;
  *       void ce_high() override;
  *       void ce_low() override;
  *   };
@@ -40,13 +40,20 @@ public:
      *    send zeros.  If `rx` is null, discard MISO data.
      * 4. De-assert CSN
      *
+     * If the SPI transfer fails (bus error, timeout, etc.), the
+     * implementation must return false without calling abort().  This
+     * allows callers — particularly the diagnostic module — to retry
+     * or report the failure instead of crashing the firmware.
+     *
      * @param cmd  8-bit SPI command byte.  Use constants and helpers from
      *              nrf24l01plus/commands.h (e.g. cmd::FLUSH_RX, cmd_r_register()).
      * @param tx   Transmit buffer (may be nullptr for read-only transactions).
      * @param rx   Receive buffer (may be nullptr for write-only transactions).
      * @param len  Number of data bytes after the command (0 for command-only).
+     * @return     true if the SPI transaction completed successfully,
+     *             false on transfer failure (bus error, timeout, etc.).
      */
-    virtual void spi_xfer(uint8_t cmd, const uint8_t *tx, uint8_t *rx, uint8_t len) = 0;
+    virtual bool spi_xfer(uint8_t cmd, const uint8_t *tx, uint8_t *rx, uint8_t len) = 0;
 
     /**
      * @brief Drive the CE pin high (activate RX or start TX pulse).
