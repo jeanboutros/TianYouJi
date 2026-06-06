@@ -1,7 +1,6 @@
 ---
 description: "Security Reviewer subagent. Embedded firmware security analysis — buffer safety, stack depth, DMA bounds, secrets handling. Participates in Phase A (requirements) and Phase C (verification)."
 mode: subagent
-model: anthropic/claude-opus-4
 permission:
   edit: deny
   bash: allow

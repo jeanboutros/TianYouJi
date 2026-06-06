@@ -1,7 +1,6 @@
 ---
 description: "Wireless Expert subagent. RF protocol compliance, BLE spec conformance, frequency/channel mapping, modulation, data whitening. Participates in Phase A (requirements) and Phase C (verification)."
 mode: subagent
-model: anthropic/claude-opus-4
 permission:
   edit: deny
   bash: allow

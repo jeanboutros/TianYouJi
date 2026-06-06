@@ -1,7 +1,6 @@
 ---
 description: "Software Engineer subagent. Architecture design, API design, component boundaries, HAL interfaces. Participates in Phase A (requirements) and Phase C (verification)."
 mode: subagent
-model: anthropic/claude-opus-4
 permission:
   edit: deny
   bash: allow

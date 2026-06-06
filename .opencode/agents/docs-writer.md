@@ -1,7 +1,6 @@
 ---
 description: "Docs Writer subagent. Doxygen documentation, learning docs, reference verification. Participates in Phase A (requirements) and Phase C (verification)."
 mode: subagent
-model: anthropic/claude-opus-4
 permission:
   edit: allow
   bash: allow

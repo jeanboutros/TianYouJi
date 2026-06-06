@@ -1,7 +1,6 @@
 ---
 description: "Hardware Engineer subagent. Validates register models, bit layouts, timing constraints, and datasheet fidelity. Participates in Phase A (requirements) and Phase C (verification)."
 mode: subagent
-model: anthropic/claude-opus-4
 permission:
   edit: deny
   bash: allow

@@ -1,7 +1,6 @@
 ---
 description: "Test Engineer subagent. Test strategy, static_assert tests, host-side unit tests, edge case coverage. Participates in Phase A (requirements), Phase B (test writing), and Phase C (verification)."
 mode: subagent
-model: anthropic/claude-opus-4
 permission:
   edit: allow
   bash: allow

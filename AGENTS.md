@@ -28,6 +28,7 @@ This project uses a 3-phase validation pipeline for all non-trivial changes.
 | `test-engineer` | Test strategy, static_assert, host-side unit tests | A, B, C |
 | `docs-writer` | Doxygen, learning docs, reference verification | A, C |
 | `code-architect` | Implementation via PAU loop | B |
+| `memory-safety` | C++ memory leak detection, RAII, heap/stack safety | A, C |
 | `pm` | Task creation, flag processing (sole authority) | All |
 
 ### OpenCode Skills
@@ -45,6 +46,7 @@ This project uses a 3-phase validation pipeline for all non-trivial changes.
 | `verification-before-completion` | No claims without fresh build evidence | All agents |
 | `brainstorming` | Structured design before code — hard gate | All (Phase A) |
 | `grill-me` | Adversarial review (Dual-Model Challenge) | Phase A & C |
+| `memory-safety` | C++ memory leak, RAII, ASAN, heap/stack safety | All agents |
 
 ### Pipeline Summary
 

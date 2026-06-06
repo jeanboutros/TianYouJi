@@ -1,7 +1,6 @@
 ---
 description: "PM (Task Master) subagent. Sole authority for creating tasks and decisions. Maintains TODO.md, processes flags from other agents."
 mode: subagent
-model: anthropic/claude-opus-4
 permission:
   edit: allow
   bash: allow

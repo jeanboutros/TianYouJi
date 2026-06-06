@@ -1,7 +1,6 @@
 ---
 description: "Code Architect subagent. Primary implementation agent. Translates specifications into C++ code following the PAU loop (Plan-Apply-Validate). Invoked in Phase B (Build)."
 mode: subagent
-model: anthropic/claude-opus-4
 permission:
   edit: allow
   bash: allow
