@@ -154,7 +154,9 @@ void configure_rx(Driver &radio, const RxConfig &config = {});
 /**
  * @brief Clear all STATUS interrupt flags (RX_DR, TX_DS, MAX_RT).
  *
- * Writes 1 to bits 6:4 of STATUS to acknowledge and clear them.
+ * In the nRF24L01+ STATUS register, interrupt flags are cleared by writing 1
+ * to the corresponding bits (write-1-to-clear semantics per datasheet §STATUS).
+ * Writing 0 to a flag bit has no effect — only a 1 acknowledges and clears it.
  *
  * @param radio  Driver instance.
  */

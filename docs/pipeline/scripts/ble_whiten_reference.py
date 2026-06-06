@@ -16,6 +16,15 @@ Usage:
 
 import sys
 
+# Galois LFSR seed bit: position 1 in the 7-bit state register.
+# Per Dmitry Grinberg: "the value we actually use is what BT'd use left shifted one"
+LFSR_SEED_BIT = 2
+
+# Galois LFSR polynomial for BLE data whitening: x^7 + x^4 + 1.
+# When bit 7 is set after shift, XOR feedback taps at bits 4 and 0.
+LFSR_POLY_MASK = 0x11
+LFSR_MSB = 0x80
+
 
 def swapbits(v: int) -> int:
     """Reverse bit order within a single byte.
@@ -59,7 +68,7 @@ def btLeWhitenStart(chan: int) -> int:
     >>> hex(btLeWhitenStart(0))
     '0x2'
     """
-    return swapbits(chan) | 2
+    return swapbits(chan) | LFSR_SEED_BIT
 
 
 def btLeWhiten(data: bytes, whiten_coeff: int) -> tuple:
@@ -88,8 +97,8 @@ def btLeWhiten(data: bytes, whiten_coeff: int) -> tuple:
         w = 0
         for b in range(8):
             m = 1 << b
-            if whiten_coeff & 0x80:
-                whiten_coeff ^= 0x11
+            if whiten_coeff & LFSR_MSB:
+                whiten_coeff ^= LFSR_POLY_MASK
                 w ^= m
             whiten_coeff = (whiten_coeff << 1) & 0xFF  # 8-bit wrap (C uint8_t behavior)
         result.append(byte_val ^ w)
@@ -119,8 +128,8 @@ def generate_whitening_sequence(channel_idx: int, num_bytes: int) -> list:
         w = 0
         for b in range(8):
             m = 1 << b
-            if lfsr & 0x80:
-                lfsr ^= 0x11
+            if lfsr & LFSR_MSB:
+                lfsr ^= LFSR_POLY_MASK
                 w ^= m
             lfsr = (lfsr << 1) & 0xFF
         masks.append(w)
