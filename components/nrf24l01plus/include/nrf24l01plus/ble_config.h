@@ -164,6 +164,10 @@ inline void clear_irq_flags(Driver &radio)
     st.rx_dr  = true;
     st.tx_ds  = true;
     st.max_rt = true;
+    /* Use the raw uint8_t overload because there is no typed write_reg(Status)
+       overload yet — write_reg(reg::STATUS, byte) is the only path available
+       for writing STATUS.  The st.to_byte() call still ensures typed
+       serialisation with reserved-bit handling. */
     radio.write_reg(reg::STATUS, st.to_byte());
 }
 
@@ -232,7 +236,7 @@ inline void switch_channel(Driver &radio, uint8_t ble_channel)
  */
 inline bool rx_available(Driver &radio)
 {
-    auto st = Status::from_byte(radio.read_reg(reg::STATUS));
+    auto st = radio.read_reg(Status{});
     return st.rx_dr;
 }
 

@@ -31,6 +31,13 @@ static constexpr gpio_num_t PIN_SCLK = GPIO_NUM_18;
 static constexpr gpio_num_t PIN_CSN  = GPIO_NUM_17;
 static constexpr gpio_num_t PIN_CE   = GPIO_NUM_5;
 
+/* BLE PDU header masks (Bluetooth Core Spec Vol 6 Part B §2.1) */
+static constexpr uint8_t BLE_PDU_TYPE_MASK   = 0x0F; ///< Bits [3:0] of PDU header byte 0
+static constexpr uint8_t BLE_PDU_LENGTH_MASK = 0x3F; ///< Bits [5:0] of PDU header byte 1
+
+/** @brief Maximum nRF24L01+ payload size in bytes (FIFO width, not BLE PDU limit). */
+static constexpr uint8_t NRF24_MAX_PAYLOAD = 32;
+
 /* PDU type names (lower 4 bits of PDU header byte 0)                 */
 static const char *pdu_type_names[] = {
     "ADV_IND", "ADV_DIRECT_IND", "ADV_NONCONN_IND", "SCAN_REQ",
@@ -81,11 +88,14 @@ static void print_register_diagnostics(nrf24::Driver &radio)
            en_rx.to_byte());
 
     /* RX_PW_P0 — expect 32 bytes (0x20) */
+    /* Note: RxPwP0 inherits from_byte() from RxPw, which returns RxPw (not
+       RxPwP0), so the typed read_reg overload cannot deduce the derived type.
+       Use the raw read + from_byte pattern instead. */
     uint8_t raw_pw = radio.read_reg(nrf24::RxPwP0::ADDRESS);
     auto pw = nrf24::RxPw::from_byte(raw_pw);
     printf("  RX_PW_P0    payload_width=%u  (raw 0x%02X)\n",
            pw.payload_width,
-           raw_pw);
+           pw.to_byte());
 
     /* RX_ADDR_P0 — expect {0x6B, 0x7D, 0x91, 0x71} (BLE adv access addr) */
     uint8_t addr[4];
@@ -100,7 +110,7 @@ static void print_register_diagnostics(nrf24::Driver &radio)
 
 static const nrf24::ble::RxConfig rx_config = {
     .initial_channel_idx  = 0,
-    .payload_width        = 32,
+    .payload_width        = NRF24_MAX_PAYLOAD,
     .scan_duration_ms     = 50,
     .extra_channels       = nullptr,
 };
@@ -137,15 +147,15 @@ static void ble_sniffer_task(void *arg)
             if (nrf24::ble::rx_available(radio))
             {
                 pkt_count++;
-                uint8_t buf[32];
-                radio.read_payload(buf, 32);
+                uint8_t buf[NRF24_MAX_PAYLOAD];
+                radio.read_payload(buf, NRF24_MAX_PAYLOAD);
                 nrf24::ble::clear_irq_flags(radio);
                 radio.flush_rx();
 
-                nrf24::ble::dewhiten(buf, 32, ble_ch);
+                nrf24::ble::dewhiten(buf, NRF24_MAX_PAYLOAD, ble_ch);
 
-                uint8_t pdu_type = buf[0] & 0x0F;
-                uint8_t pdu_len = buf[1] & 0x3F;
+                uint8_t pdu_type = buf[0] & BLE_PDU_TYPE_MASK;
+                uint8_t pdu_len = buf[1] & BLE_PDU_LENGTH_MASK;
                 const char *type = pdu_type_names[pdu_type < 7 ? pdu_type : 7];
 
                 printf("[ch%u] %-17s  %02X:%02X:%02X:%02X:%02X:%02X  len=%u\n",
@@ -153,7 +163,7 @@ static void ble_sniffer_task(void *arg)
                        buf[7], buf[6], buf[5], buf[4], buf[3], buf[2],
                        pdu_len);
 
-                uint8_t print_len = (pdu_len + 2 <= 32) ? pdu_len + 2 : 32;
+                uint8_t print_len = (pdu_len + 2 <= NRF24_MAX_PAYLOAD) ? pdu_len + 2 : NRF24_MAX_PAYLOAD;
                 printf("  pdu:");
                 for (uint8_t i = 0; i < print_len; i++)
                 {

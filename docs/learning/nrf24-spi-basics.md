@@ -1,5 +1,7 @@
 # NRF24L01+ SPI Basics
 
+> **Note:** Code examples in this document use the low-level SPI API (raw register addresses and values) for educational purposes. Production code should use the typed struct API — see [cpp-enum-class-and-struct.md](cpp-enum-class-and-struct.md).
+
 ## Overview
 
 The NRF24L01+ is a 2.4 GHz ISM band transceiver controlled entirely via SPI. This document covers wiring, the SPI protocol, the NRF24 register map, and writing an ESP-IDF SPI driver component.
@@ -413,11 +415,13 @@ After power-on reset, the STATUS register (0x07) should read **0x0E**:
 void app_main(void) {
     // Init SPI bus + device + CE pin...
     
-    uint8_t status = nrf24_read_reg(0x07);  // STATUS register
+    uint8_t status = nrf24_read_reg(0x07);  // STATUS register (nrf24::reg::STATUS)
     printf("STATUS = 0x%02X (expected 0x0E)\n", status);
+    // Typed: Status st = Status::from_byte(status); st.format(buf, len);
     
-    uint8_t config = nrf24_read_reg(0x00);  // CONFIG register
+    uint8_t config = nrf24_read_reg(0x00);  // CONFIG register (nrf24::reg::CONFIG)
     printf("CONFIG = 0x%02X (expected 0x08)\n", config);
+    // Typed: Config cfg = Config::from_byte(config); cfg.format(buf, len);
 }
 ```
 

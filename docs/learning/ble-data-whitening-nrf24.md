@@ -1,5 +1,7 @@
 # BLE Data Whitening on the nRF24L01+ — Bugs, Correct Implementation, and Lessons
 
+> **Note:** This document analyses the BLE whitening algorithm at the bit level, using raw hex values for LFSR constants and register-level explanations. The nRF24 library provides `nrf24::ble::dewhiten()` which encapsulates the correct implementation — see [cpp-enum-class-and-struct.md](cpp-enum-class-and-struct.md) for the typed API pattern.
+
 ## 1. Overview
 
 BLE applies **data whitening** to every on-air packet (PDU + CRC) before
@@ -19,10 +21,10 @@ applies the identical sequence to recover the original data.
 
 ### The polynomial
 
-BLE uses the polynomial **x^7 + x^4 + 1**, which defines the LFSR feedback
+BLE uses the polynomial **x^7 + x^4 + 1** (`BLE_CRC24_POLY` in code), which defines the LFSR feedback
 taps.  In the 7-bit Galois LFSR state, this means: when the shift-out bit is
 1, XOR the state with bits at positions 4 and 0 before the next shift.  The
-encoded tap mask in the 8-bit working register is `0x11` (bit 4 = x^4, bit 0
+encoded tap mask in the 8-bit working register is `0x11` (`BLE_WHITEN_POLY` in code, bit 4 = x^4, bit 0
 = 1).
 
 ### The 7-bit LFSR mechanism
@@ -187,29 +189,35 @@ remember the bit-swap step.
 
 ```
 @code
+ // BLE whitening named constants
+ #define BLE_WHITEN_POLY      0x11  // Galois LFSR polynomial taps: x^7 + x^4 + 1 → bits 4 and 0
+ #define BLE_WHITEN_SEED_BIT  0x02  // Bit 1 of the Galois LFSR seed (constant for all channels)
+
  // Galois LFSR dewhitening — symmetric (same function whitens and dewhitens)
- // Polynomial: x^7 + x^4 + 1, encoded as 0x11 in the 8-bit working register
+ // Polynomial: x^7 + x^4 + 1, encoded as BLE_WHITEN_POLY (0x11) in the 7-bit state
  // Reference: Dmitry Grinberg, "Bit-banging Bluetooth Low Energy"
- 
+  
  void dewhiten(uint8_t *data, uint8_t len, uint8_t channel_idx)
  {
-     // Step 1: bit-swap each byte (nRF24 MSbit-first → BLE LSbit-first)
+     // Step 1: bit-swap each byte (nRF24L01+ MSbit-first → BLE LSbit-first)
      for (uint8_t i = 0; i < len; i++)
          data[i] = nrf24::ble::swapbits(data[i]);
- 
-     // Step 2: Galois LFSR
-     uint8_t lfsr = nrf24::ble::swapbits(channel_idx) | 0x02;  // seed
-     for (uint8_t i = 0; i < len; i++) {
-         for (uint8_t m = 1; m; m <<= 1) {  // m walks bit 0→7; stops when wraps
-             if (lfsr & 0x80) {              // bit 7 set?
-                 lfsr ^= 0x11;              // apply feedback taps (bits 4, 0)
-                 data[i] ^= m;             // XOR whitening bit into data
+  
+     // Step 2: Galois LFSR dewhitening (Dmitry Grinberg's algorithm).
+     // Polynomial x^7+x^4+1 encoded as BLE_WHITEN_POLY (0x11) in the 7-bit state.
+     // Seed: nrf24::ble::swapbits(channel_idx) | BLE_WHITEN_SEED_BIT (0x02).
+     uint8_t lfsr = nrf24::ble::swapbits(channel_idx) | BLE_WHITEN_SEED_BIT;  // line A
+     for (uint8_t i = 0; i < len; i++) {                        // line B
+         for (uint8_t m = 1; m; m <<= 1) {                      // line C
+             if (lfsr & 0x80) {                                  // line D
+                 lfsr ^= BLE_WHITEN_POLY;                        // line E
+                 data[i] ^= m;                                   // line F
              }
-             lfsr <<= 1;                    // left-shift (Galois)
+             lfsr <<= 1;                                          // line G
          }
      }
  }
- @endcode
+@endcode
 ```
 
 Key points:
@@ -264,7 +272,7 @@ produce **different output sequences** for the same polynomial, because the
 feedback is applied at different points in the shift cycle.
 
 Additionally, the seed was wrong: `(channel_idx & 0x3F) | 0x40` instead of
-`swapbits(channel_idx) | 2`.  These are not equivalent:
+`swapbits(channel_idx) | BLE_WHITEN_SEED_BIT`.  These are not equivalent:
 
 | Channel | Wrong: `(ch & 0x3F) \| 0x40` | Correct: `swapbits(ch) \| 2` |
 |---------|-----------------------------|-----------------------------|
@@ -282,8 +290,8 @@ values still produce completely different whitening sequences.
 |--------|-------------------|------------------|
 | Shift direction | Right (`>>= 1`) | Left (`<<= 1`) |
 | Feedback check | Bit 0 (`& 0x01`) | Bit 7 (`& 0x80`) |
-| Feedback XOR | `0x48` | `0x11` |
-| Seed | `(ch & 0x3F) \| 0x40` | `swapbits(ch) \| 2` |
+| Feedback XOR | `0x48` | `0x11` (`BLE_WHITEN_POLY`) |
+| Seed | `(ch & 0x3F) | 0x40` | `swapbits(ch) | BLE_WHITEN_SEED_BIT` (`0x02`) |
 | Bit-swap | **Missing** | Performed first |
 
 **Concrete example — different whitening sequences for channel 37:**
@@ -308,6 +316,10 @@ transformations.
 
 ```
 @code
+ // BLE whitening named constants (also defined in the library header)
+ #define BLE_WHITEN_POLY      0x11  // Galois LFSR polynomial taps: x^7 + x^4 + 1 → bits 4 and 0
+ #define BLE_WHITEN_SEED_BIT  0x02  // Bit 1 of the Galois LFSR seed (constant for all channels)
+
  void dewhiten(uint8_t *data, uint8_t len, uint8_t channel_idx)
  {
      // Step 1: bit-swap each byte (nRF24L01+ MSbit-first → BLE LSbit-first)
@@ -315,13 +327,13 @@ transformations.
          data[i] = nrf24::ble::swapbits(data[i]);
  
      // Step 2: Galois LFSR dewhitening (Dmitry Grinberg's algorithm).
-     // Polynomial x^7+x^4+1 encoded as 0x11 in the 7-bit state.
-     // Seed: nrf24::ble::swapbits(channel_idx) | 2.
-     uint8_t lfsr = nrf24::ble::swapbits(channel_idx) | 0x02;  // line A
+     // Polynomial x^7+x^4+1 encoded as BLE_WHITEN_POLY (0x11) in the 7-bit state.
+     // Seed: nrf24::ble::swapbits(channel_idx) | BLE_WHITEN_SEED_BIT (0x02).
+     uint8_t lfsr = nrf24::ble::swapbits(channel_idx) | BLE_WHITEN_SEED_BIT;  // line A
      for (uint8_t i = 0; i < len; i++) {                        // line B
          for (uint8_t m = 1; m; m <<= 1) {                      // line C
              if (lfsr & 0x80) {                                  // line D
-                 lfsr ^= 0x11;                                    // line E
+                 lfsr ^= BLE_WHITEN_POLY;                        // line E
                  data[i] ^= m;                                   // line F
              }
              lfsr <<= 1;                                          // line G
@@ -335,11 +347,11 @@ transformations.
 
 | Line | Code | Explanation |
 |------|------|-------------|
-| A | `lfsr = swapbits(channel_idx) \| 0x02` | Compute channel-specific Galois seed. `swapbits` reverses bit order to match MSB-first LFSR. `\| 0x02` sets position 1. |
+| A | `lfsr = swapbits(channel_idx) \| BLE_WHITEN_SEED_BIT` | Compute channel-specific Galois seed. `swapbits` reverses bit order to match MSB-first LFSR. `BLE_WHITEN_SEED_BIT` (`0x02`) sets position 1. |
 | B | `for (uint8_t i = 0; i < len; i++)` | Process each byte of the (already bit-swapped) data. |
 | C | `for (uint8_t m = 1; m; m <<= 1)` | Walk through bit positions 0–7. `m` starts at 1, doubles each iteration, wraps to 0 after bit 7 (terminates). |
 | D | `if (lfsr & 0x80)` | Check if the LFSR output bit (MSB of the 8-bit working register) is 1. |
-| E | `lfsr ^= 0x11` | Apply Galois feedback: XOR the polynomial taps (bits 4 and 0) into the state. |
+| E | `lfsr ^= BLE_WHITEN_POLY` | Apply Galois feedback: XOR the polynomial taps (bits 4 and 0, `0x11`) into the state. |
 | F | `data[i] ^= m` | XOR the whitening bit (1) into the current bit position of the data byte. |
 | G | `lfsr <<= 1` | Left-shift the LFSR state (Galois form). `uint8_t` overflow naturally discards the bit shifted out of position 7. |
 
@@ -403,9 +415,9 @@ This matches the reference implementation output.
 | Aspect | Dmitry Grinberg (original) | Our `nrf24::ble::dewhiten()` |
 |--------|-----------------------------|------------------------------|
 | Language | C (AVR GCC) | C++ (ESP-IDF) |
-| Seed | `swapbits(chan) \| 2` | `nrf24::ble::swapbits(channel_idx) \| 0x02` |
+| Seed | `swapbits(chan) \| 2` | `nrf24::ble::swapbits(channel_idx) \| BLE_WHITEN_SEED_BIT` |
 | LFSR form | Galois, left-shift | Galois, left-shift |
-| Feedback XOR | `0x11` | `0x11` |
+| Feedback XOR | `0x11` | `0x11` (`BLE_WHITEN_POLY`) |
 | Bit order | LSB→MSB (`m = 1; m; m <<= 1`) | Same |
 | Bit-swap | Separate: `swapbits` before/after in `btLePacketEncode` | Integrated: first step inside `dewhiten()` |
 | Symmetry | Same function whitens and dewhitens | Same |

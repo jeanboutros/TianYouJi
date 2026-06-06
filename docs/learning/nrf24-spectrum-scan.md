@@ -1,5 +1,7 @@
 # NRF24L01+ Passive Spectrum Scan
 
+> **Note:** Code examples in this document use the low-level SPI API (raw register addresses and values) for educational purposes. Production code should use the typed struct API — see [cpp-enum-class-and-struct.md](cpp-enum-class-and-struct.md).
+
 ## Overview
 
 The NRF24L01+ can act as a simple 2.4 GHz spectrum analyzer by using its **Received Power Detector (RPD)** register. This is completely passive (RX only) — no transmission occurs, making it legal everywhere.
@@ -58,28 +60,34 @@ void nrf24_spectrum_scan(void) {
 
     // Disable auto-ACK (we're just scanning, not communicating)
     nrf24_write_reg(0x01, 0x00);  // EN_AA: all disabled
+    // Typed: EnAa{.pipe={false,false,false,false,false,false}}.to_byte() → 0x00
 
     // Disable all RX pipes except pipe 0
     nrf24_write_reg(0x02, 0x01);  // EN_RXADDR: pipe 0 only
+    // Typed: EnRxAddr{.pipe={true,false,false,false,false,false}}.to_byte() → 0x01
 
     // Set to 2Mbps for wider bandwidth detection
     nrf24_write_reg(0x06, 0x08);  // RF_SETUP: 2Mbps, -18dBm (power irrelevant for RX)
+    // Typed: RfSetup{.data_rate=DataRate::Mbps2, .tx_power=TxPower::Minus18dBm}.to_byte() → 0x08
 
     // Power up in RX mode
     nrf24_write_reg(0x00, 0x0F);  // CONFIG: PWR_UP=1, PRIM_RX=1
+    // Typed: Config{.power_mode=PowerMode::Up, .primary=PrimaryMode::RX, .crc_mode=CrcMode::Enabled, .crc_encoding=CrcEncoding::Bytes1}.to_byte() → 0x0F
     vTaskDelay(pdMS_TO_TICKS(2));  // Power-up delay
 
     for (int sample = 0; sample < SAMPLES; sample++) {
         for (int ch = 0; ch < NUM_CHANNELS; ch++) {
             // Set channel
-            nrf24_write_reg(0x05, ch);
+            nrf24_write_reg(0x05, ch);  // RF_CH
+            // Typed: RfCh{.channel=ch}.to_byte()
 
             // Enter RX mode
             nrf24_ce_high();
             esp_rom_delay_us(200);  // Wait for RPD to settle
 
             // Read RPD
-            uint8_t rpd = nrf24_read_reg(0x09);
+            uint8_t rpd = nrf24_read_reg(0x09);  // RPD register (nrf24::reg::RPD)
+            // Typed: Rpd rpd_val = Rpd::from_byte(rpd); rpd_val.received_power indicates signal
             if (rpd & 0x01) {
                 channel_hits[ch]++;
             }

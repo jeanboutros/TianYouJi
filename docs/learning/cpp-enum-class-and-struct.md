@@ -24,11 +24,11 @@ Plain `enum` has two problems that make it unsuitable for library code:
 
 `enum class` fixes both:
 ```cpp
-enum class NrfTxPower : uint8_t { Minus18dBm = 0b00, dBm0 = 0b11 };
+enum class TxPower : uint8_t { Minus18dBm = 0b00, dBm0 = 0b11 };
 
-NrfTxPower p = NrfTxPower::Minus18dBm;  // must qualify — name does not leak
-uint8_t x = NrfTxPower::Minus18dBm;     // ❌ compile error — must cast explicitly
-uint8_t x = static_cast<uint8_t>(NrfTxPower::Minus18dBm);  // ✓
+nrf24::TxPower p = nrf24::TxPower::Minus18dBm;  // must qualify — name does not leak
+uint8_t x = static_cast<uint8_t>(nrf24::TxPower::Minus18dBm);     // ✓ explicit cast
+// uint8_t x = nrf24::TxPower::Minus18dBm;                       // ❌ compile error
 ```
 
 The `: uint8_t` suffix pins the **underlying storage type** to one byte.
@@ -64,6 +64,8 @@ struct RfSetup {
 };
 ```
 
+This matches the actual `nrf24::RfSetup` struct in the library. See `nrf24l01plus/registers/rf_setup.h` for the full implementation.
+
 - **`const` method**: the compiler enforces that it never modifies any member.
   Call it on a `const RfSetup` or through a `const` pointer.
 - **`static` method**: belongs to the type, not to any instance.
@@ -75,20 +77,24 @@ struct RfSetup {
 
 ```cpp
 // Configure register fields with named values
-RfSetup cfg;
-cfg.data_rate = NrfDataRate::Kbps250;
-cfg.tx_power  = NrfTxPower::Minus6dBm;
-nrf24_write_reg(REG_RF_SETUP, cfg.to_byte());  // serialise to raw byte
+nrf24::RfSetup cfg;
+cfg.data_rate = nrf24::DataRate::Kbps250;
+cfg.tx_power  = nrf24::TxPower::Minus6dBm;
+nrf24_write_reg(nrf24::RfSetup::ADDRESS, cfg.to_byte());  // serialise to raw byte
 
 // Read back and inspect
-RfSetup actual = RfSetup::from_byte(nrf24_read_reg(REG_RF_SETUP));
-// actual.data_rate == NrfDataRate::Kbps250  (if device accepted it)
+nrf24::RfSetup actual = nrf24::RfSetup::from_byte(
+    nrf24_read_reg(nrf24::reg::RF_SETUP));
+// actual.data_rate == nrf24::DataRate::Kbps250  (if device accepted it)
+
+// Or use the typed overload (deduces address from struct type):
+radio.write_reg(cfg);  // deduces nrf24::RfSetup::ADDRESS
 
 // Round-trip test
-RfSetup a;
-a.data_rate = NrfDataRate::Kbps250;
-RfSetup b = RfSetup::from_byte(a.to_byte());
-assert(b.data_rate == NrfDataRate::Kbps250);
+nrf24::RfSetup a;
+a.data_rate = nrf24::DataRate::Kbps250;
+nrf24::RfSetup b = nrf24::RfSetup::from_byte(a.to_byte());
+assert(b.data_rate == nrf24::DataRate::Kbps250);
 ```
 
 ---

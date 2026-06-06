@@ -1,5 +1,7 @@
 # NRF24L01+ Point-to-Point Communication
 
+> **Note:** Code examples in this document use the low-level SPI API (raw register addresses and values) for educational purposes. Production code should use the typed struct API — see [cpp-enum-class-and-struct.md](cpp-enum-class-and-struct.md).
+
 ## Overview
 
 This document covers sending data between TWO NRF24L01+ modules connected to the same ESP32 via shared VSPI bus with separate CE/CSN pins.
@@ -86,10 +88,12 @@ NRF24L01+ supports hardware auto-ACK:
 ```c
 // Enable auto-ACK on pipe 0 (register 0x01)
 nrf24_write_reg(0x01, 0x01);  // EN_AA: only pipe 0
+// Typed: EnAa{.pipe={true,false,false,false,false,false}}.to_byte() → 0x01
 
 // Set retransmit: 500µs delay, 3 retries (register 0x04)
 // ARD = 0001 (500µs), ARC = 0011 (3 retries)
 nrf24_write_reg(0x04, 0x13);
+// Typed: SetupRetr{.delay=AutoRetransmitDelay::Us500, .count=AutoRetransmitCount::Count3}.to_byte() → 0x13
 ```
 
 ### SETUP_RETR register (0x04)
@@ -107,6 +111,7 @@ nrf24_write_reg(0x04, 0x13);
 void nrf24_tx_setup(spi_device_handle_t handle, const uint8_t *addr) {
     // 1. Power down first
     nrf24_write_reg(0x00, 0x08);  // CONFIG: PWR_UP=0, CRC on
+    // Typed: Config{.crc_mode=CrcMode::Enabled, .crc_encoding=CrcEncoding::Bytes1, .power_mode=PowerMode::Down, .primary=PrimaryMode::TX}.to_byte() → 0x08
 
     // 2. Set TX address (5 bytes)
     nrf24_write_multi(0x10, addr, 5);  // TX_ADDR
@@ -116,21 +121,26 @@ void nrf24_tx_setup(spi_device_handle_t handle, const uint8_t *addr) {
 
     // 4. Set channel
     nrf24_write_reg(0x05, 76);   // RF_CH: channel 76 (2476 MHz)
+    // Typed: RfCh{.channel=76}.to_byte() → 76
 
     // 5. Set data rate and power
     nrf24_write_reg(0x06, 0x06); // RF_SETUP: 1Mbps, 0dBm
+    // Typed: RfSetup{.data_rate=DataRate::Mbps1, .tx_power=TxPower::dBm0}.to_byte() → 0x06
 
     // 6. Enable auto-ACK on pipe 0
     nrf24_write_reg(0x01, 0x01); // EN_AA
+    // Typed: EnAa{.pipe={true,false,false,false,false,false}}.to_byte() → 0x01
 
     // 7. Set payload size for pipe 0
     nrf24_write_reg(0x11, 4);    // RX_PW_P0: 4 bytes
 
     // 8. Set retransmit
     nrf24_write_reg(0x04, 0x13); // SETUP_RETR: 500µs, 3 retries
+    // Typed: SetupRetr{.delay=AutoRetransmitDelay::Us500, .count=AutoRetransmitCount::Count3}.to_byte() → 0x13
 
     // 9. Power up as TX
     nrf24_write_reg(0x00, 0x0E); // CONFIG: PWR_UP=1, PRIM_RX=0, CRC=2bytes
+    // Typed: Config{.crc_mode=CrcMode::Enabled, .crc_encoding=CrcEncoding::Bytes2, .power_mode=PowerMode::Up, .primary=PrimaryMode::TX}.to_byte() → 0x0E
     vTaskDelay(pdMS_TO_TICKS(2)); // 1.5ms power-up delay
 }
 
@@ -145,15 +155,17 @@ bool nrf24_send(spi_device_handle_t handle, const uint8_t *data, uint8_t len) {
 
     // 3. Wait for TX_DS or MAX_RT
     vTaskDelay(pdMS_TO_TICKS(5));
-    uint8_t status = nrf24_read_reg(0x07);
+    uint8_t status = nrf24_read_reg(0x07);  // STATUS register
 
     // 4. Clear flags
     nrf24_write_reg(0x07, 0x70);  // Clear all IRQ flags
+    // Typed: Status{.rx_dr=true, .tx_ds=true, .max_rt=true}.to_byte() → 0x70
 
-    if (status & 0x20) {  // TX_DS bit set
+    // Typed: Status::from_byte(status).tx_ds checks bit 5
+    if (status & 0x20) {  // TX_DS bit set (Status::from_byte(status).tx_ds == true)
         return true;      // Success!
     }
-    if (status & 0x10) {  // MAX_RT bit set
+    if (status & 0x10) {  // MAX_RT bit set (Status::from_byte(status).max_rt == true)
         nrf24_flush_tx(); // Flush the failed payload
         return false;     // Failed after retries
     }
@@ -168,28 +180,34 @@ bool nrf24_send(spi_device_handle_t handle, const uint8_t *data, uint8_t len) {
 ```c
 void nrf24_rx_setup(spi_device_handle_t handle, const uint8_t *addr) {
     // 1. Power down first
-    nrf24_write_reg(0x00, 0x08);
+    nrf24_write_reg(0x00, 0x08);  // CONFIG: PWR_UP=0, CRC on
+    // Typed: Config{.crc_mode=CrcMode::Enabled, .crc_encoding=CrcEncoding::Bytes1, .power_mode=PowerMode::Down, .primary=PrimaryMode::TX}.to_byte() → 0x08
 
     // 2. Set RX address pipe 0
     nrf24_write_multi(0x0A, addr, 5);  // RX_ADDR_P0
 
     // 3. Enable pipe 0
     nrf24_write_reg(0x02, 0x01);  // EN_RXADDR: pipe 0
+    // Typed: EnRxAddr{.pipe={true,false,false,false,false,false}}.to_byte() → 0x01
 
     // 4. Set channel (must match TX)
     nrf24_write_reg(0x05, 76);    // RF_CH: channel 76
+    // Typed: RfCh{.channel=76}.to_byte() → 76
 
     // 5. Set data rate (must match TX)
     nrf24_write_reg(0x06, 0x06);  // RF_SETUP: 1Mbps, 0dBm
+    // Typed: RfSetup{.data_rate=DataRate::Mbps1, .tx_power=TxPower::dBm0}.to_byte() → 0x06
 
     // 6. Enable auto-ACK on pipe 0
-    nrf24_write_reg(0x01, 0x01);
+    nrf24_write_reg(0x01, 0x01);  // EN_AA: pipe 0
+    // Typed: EnAa{.pipe={true,false,false,false,false,false}}.to_byte() → 0x01
 
     // 7. Set payload size
     nrf24_write_reg(0x11, 4);     // RX_PW_P0: 4 bytes
 
     // 8. Power up as RX
     nrf24_write_reg(0x00, 0x0F);  // CONFIG: PWR_UP=1, PRIM_RX=1, CRC=2bytes
+    // Typed: Config{.crc_mode=CrcMode::Enabled, .crc_encoding=CrcEncoding::Bytes2, .power_mode=PowerMode::Up, .primary=PrimaryMode::RX}.to_byte() → 0x0F
     vTaskDelay(pdMS_TO_TICKS(2));
 
     // 9. Set CE high to start listening
@@ -197,8 +215,9 @@ void nrf24_rx_setup(spi_device_handle_t handle, const uint8_t *addr) {
 }
 
 bool nrf24_data_available(void) {
-    uint8_t status = nrf24_read_reg(0x07);
-    return (status & 0x40) != 0;  // RX_DR bit
+    uint8_t status = nrf24_read_reg(0x07);  // STATUS register
+    return (status & 0x40) != 0;  // RX_DR bit (bit 6)
+    // Typed: Status::from_byte(status).rx_dr == true
 }
 
 void nrf24_read_payload(uint8_t *buf, uint8_t len) {
@@ -206,7 +225,8 @@ void nrf24_read_payload(uint8_t *buf, uint8_t len) {
     nrf24_read_multi(0x61, buf, len);
 
     // Clear RX_DR flag
-    nrf24_write_reg(0x07, 0x40);
+    nrf24_write_reg(0x07, 0x40);  // Clear RX_DR only
+    // Typed: Status{.rx_dr=true}.to_byte() → 0x40
 }
 ```
 
@@ -307,7 +327,10 @@ Instead of fixed payload sizes, you can enable dynamic payloads:
 ```c
 // Enable dynamic payload feature
 nrf24_write_reg(0x1D, 0x04);  // FEATURE: EN_DPL=1
+// Typed: Feature{.en_dpl=DplMode::Enabled}.to_byte() → 0x04
+
 nrf24_write_reg(0x1C, 0x01);  // DYNPD: enable on pipe 0
+// Typed: Dynpd{.pipe={true,false,false,false,false,false}}.to_byte() → 0x01
 ```
 
 With dynamic payloads:

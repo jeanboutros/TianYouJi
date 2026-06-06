@@ -8,12 +8,22 @@
 namespace nrf24 {
 namespace diag {
 
+/** @brief Mask for all valid bits in a register with no reserved bits. */
+static constexpr uint8_t REG_MASK_ALL = 0xFF;
+
+/** @brief Mask for bits [6:0] of RF_CH (bit 7 is reserved, per datasheet §9.4). */
+static constexpr uint8_t REG_MASK_RF_CH = 0x7F;
+
+/** @brief Mask for bits [5:0] of RX_PW_Px (bits [7:6] are reserved, per datasheet §9.8). */
+static constexpr uint8_t REG_MASK_RX_PW = 0x3F;
+
 bool verify_ble_rx(Driver &radio, const ble::RxConfig &config)
 {
     printf("\n=== NRF24L01+ Diagnostic ===\n");
     bool all_pass = true;
 
-    uint8_t raw_status = radio.read_reg(reg::STATUS);
+    auto status = radio.read_reg(Status{});
+    uint8_t raw_status = status.to_byte();
     bool spi_ok = (raw_status != 0xFF);
     printf("  SPI comms           STATUS=0x%02X  [%s]\n",
            raw_status, spi_ok ? "PASS" : "FAIL -- check wiring / power");
@@ -61,14 +71,14 @@ bool verify_ble_rx(Driver &radio, const ble::RxConfig &config)
         uint8_t     expected;
         uint8_t     mask;
     } checks[] = {
-        { "CONFIG",     reg::CONFIG,     exp_config.to_byte(),  0xFF },
-        { "EN_AA",      reg::EN_AA,      exp_en_aa.to_byte(),   0xFF },
-        { "EN_RXADDR",  reg::EN_RXADDR,  exp_en_rx.to_byte(),   0xFF },
-        { "SETUP_AW",   reg::SETUP_AW,   exp_aw.to_byte(),      0xFF },
-        { "SETUP_RETR", reg::SETUP_RETR, exp_retr.to_byte(),    0xFF },
-        { "RF_CH",      reg::RF_CH,      exp_rf_ch.to_byte(),   0x7F },
-        { "RF_SETUP",   reg::RF_SETUP,   exp_rf.to_byte(),      0xFF },
-        { "RX_PW_P0",   reg::RX_PW_P0,  exp_pw.to_byte(),      0x3F },
+        { "CONFIG",     reg::CONFIG,     exp_config.to_byte(),  REG_MASK_ALL },
+        { "EN_AA",      reg::EN_AA,      exp_en_aa.to_byte(),   REG_MASK_ALL },
+        { "EN_RXADDR",  reg::EN_RXADDR,  exp_en_rx.to_byte(),   REG_MASK_ALL },
+        { "SETUP_AW",   reg::SETUP_AW,   exp_aw.to_byte(),      REG_MASK_ALL },
+        { "SETUP_RETR", reg::SETUP_RETR, exp_retr.to_byte(),    REG_MASK_ALL },
+        { "RF_CH",      reg::RF_CH,      exp_rf_ch.to_byte(),   REG_MASK_RF_CH },
+        { "RF_SETUP",   reg::RF_SETUP,   exp_rf.to_byte(),      REG_MASK_ALL },
+        { "RX_PW_P0",   reg::RX_PW_P0,  exp_pw.to_byte(),      REG_MASK_RX_PW },
     };
 
     for (int i = 0; i < (int)(sizeof(checks) / sizeof(checks[0])); i++) {

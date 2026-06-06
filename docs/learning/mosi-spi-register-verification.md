@@ -1,5 +1,7 @@
 # MOSI SPI Pin Direction Bug, Register Verification, and Multi-Agent Review Findings
 
+> **Note:** Diagnostic tables in this document include raw register values for clarity. Production code should use the typed struct API — see [cpp-enum-class-and-struct.md](cpp-enum-class-and-struct.md).
+
 ## 1. Overview
 
 This document captures findings from multi-agent review and debugging sessions on the ESP32 nRF24L01+ BLE sniffer project. The most critical finding is a bug where setting the MOSI GPIO pin to `GPIO_MODE_INPUT` after SPI initialization silently broke all SPI write operations. Additional findings cover BLE dewhitening bugs, access address byte order verification, register write-and-verify debugging, zero-packets diagnosis, memory safety fixes, and a summary of the challenger review process.
@@ -197,18 +199,18 @@ In production, you may remove these checks for performance, but during bring-up 
 
 When all register read-backs PASS (CONFIG=0x03, RF_CH=0x02, EN_RXADDR=0x01, etc.) but `pkts=0` continuously, follow this diagnostic checklist:
 
-| # | Check | Why It Matters |
-|---|-------|---------------|
-| 1 | CONFIG = 0x03 (PWR_UP=1, PRIM_RX=1, CRC disabled) | Radio must be powered up in RX mode for BLE sniffing |
-| 2 | RF_CH matches expected BLE frequency | Channel must map correctly: ch37→RF_CH=2, ch38→RF_CH=26, ch39→RF_CH=80 |
-| 3 | EN_RXADDR has pipe 0 enabled | RX pipe 0 must be enabled to receive |
-| 4 | RX_ADDR_P0 = BLE access address | Must be `{0x6B, 0x7D, 0x91, 0x71}` (bit-reversed, LSByte-first) |
-| 5 | RX_PW_P0 = 32 | Maximum payload width to capture full BLE packets |
-| 6 | CE is HIGH during RX mode | nRF24L01+ requires CE HIGH to remain in RX mode |
-| 7 | **MOSI pin is NOT set to GPIO_MODE_INPUT** | This was the root cause — disconnects MOSI from SPI |
-| 8 | No SPI pin conflicts with ESP32 GPIO routing | Check for strapping pins, flash pins, etc. |
-| 9 | BLE devices are actually advertising nearby | Use Ubertooth or phone BLE scanner app to confirm |
-| 10 | nRF24L01+ antenna and power supply (3.3V, stable) | Add 10µF + 100nF decoupling caps near VCC/GND |
+| # | Check | Why It Matters | Typed Equivalent |
+|---|-------|---------------|-----------------|
+| 1 | CONFIG = 0x03 (PWR_UP=1, PRIM_RX=1, CRC disabled) | Radio must be powered up in RX mode for BLE sniffing | `Config{.power_mode=PowerMode::Up, .primary=PrimaryMode::RX, .crc_mode=CrcMode::Disabled}.to_byte() → 0x03` |
+| 2 | RF_CH matches expected BLE frequency | Channel must map correctly: ch37→RF_CH=2, ch38→RF_CH=26, ch39→RF_CH=80 | `RfCh{.channel=2}.to_byte() → 0x02` |
+| 3 | EN_RXADDR has pipe 0 enabled | RX pipe 0 must be enabled to receive | `EnRxAddr{.pipe={true,false,false,false,false,false}}.to_byte() → 0x01` |
+| 4 | RX_ADDR_P0 = BLE access address | Must be `{0x6B, 0x7D, 0x91, 0x71}` (bit-reversed, LSByte-first) | — |
+| 5 | RX_PW_P0 = 32 | Maximum payload width to capture full BLE packets | `RxPw{.payload_width=32}.to_byte() → 0x20` |
+| 6 | CE is HIGH during RX mode | nRF24L01+ requires CE HIGH to remain in RX mode | — |
+| 7 | **MOSI pin is NOT set to GPIO_MODE_INPUT** | This was the root cause — disconnects MOSI from SPI | — |
+| 8 | No SPI pin conflicts with ESP32 GPIO routing | Check for strapping pins, flash pins, etc. | — |
+| 9 | BLE devices are actually advertising nearby | Use Ubertooth or phone BLE scanner app to confirm | — |
+| 10 | nRF24L01+ antenna and power supply (3.3V, stable) | Add 10µF + 100nF decoupling caps near VCC/GND | — |
 
 ---
 

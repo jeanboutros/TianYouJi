@@ -53,9 +53,19 @@ public:
      * Sends the W_REGISTER command (bits [7:5] = 001) with the 5-bit
      * register address followed by one data byte on MOSI.
      *
+     * Prefer the typed struct overload (write_reg(cfg)) for single-byte
+     * registers — it deduces the address and prevents wrong-register
+     * mistakes at compile time.
+     *
      * @code
-     *   cmd byte: 0b001A_AAAA   (A = reg address)
-     *   write_reg(nrf24::reg::CONFIG, 0x03) -> cmd = 0x20, writes CONFIG
+     *   // Preferred: typed struct overload (deduces address)
+     *   nrf24::Config cfg;
+     *   cfg.power_mode = nrf24::PowerMode::Up;
+     *   cfg.primary    = nrf24::PrimaryMode::RX;
+     *   radio.write_reg(cfg);
+     *
+     *   // Low-level: internal use only (does not enforce struct types)
+     *   radio.write_reg(nrf24::reg::CONFIG, cfg.to_byte());
      * @endcode
      *
      * @param reg    Register address (only bits [4:0] used).  Use constants
@@ -138,13 +148,19 @@ public:
      * comparison, so should only be used during debug/validation sequences.
      *
      * @code
-     *   bool ok = radio.write_and_verify(nrf24::reg::CONFIG, 0x03);
+     *   nrf24::Config cfg;
+     *   cfg.power_mode = nrf24::PowerMode::Up;
+     *   cfg.primary    = nrf24::PrimaryMode::RX;
+     *   bool ok = radio.write_and_verify(cfg);
      *   // ok == true  → device accepted the write
      *   // ok == false → read-back mismatch (SPI or write issue)
      * @endcode
      *
-     * @param reg    Register address (use constants from nrf24::reg::).
-     * @param value  Byte to write.
+     * Prefer the typed struct overload (write_and_verify(cfg)) for single-byte
+     * registers — it deduces the address and normalises reserved bits.
+     *
+     * @param reg    Register address (use constants from nrf24::reg::).  // internal use
+     * @param value  Byte to write.                                        // internal use
      * @return       true if read-back matches value, false otherwise.
      */
     bool write_and_verify(uint8_t reg, uint8_t value);

@@ -1,5 +1,7 @@
 # NRF24L01+ BLE Packet Crafting
 
+> **Note:** Code examples in this document use the low-level SPI API (raw register addresses and values) for educational purposes. Production code should use the typed struct API — see [cpp-enum-class-and-struct.md](cpp-enum-class-and-struct.md).
+
 ## Overview
 
 The NRF24L01+ operates on the same 2.4 GHz ISM band as BLE. Because BLE uses GFSK modulation at 1 Mbps — the exact same modulation the NRF24 supports — you can craft raw BLE advertising packets and transmit them from the NRF24. A phone's BLE scanner will detect these packets as if they came from a real BLE device.
@@ -94,20 +96,24 @@ Header byte 1 = length of payload following the header
 ## 3. BLE CRC24 Calculation
 
 BLE uses a 24-bit CRC with:
-- Polynomial: `x^24 + x^10 + x^9 + x^6 + x^4 + x^3 + x + 1` = `0x00065B`
-- Initial value: `0x555555` (for advertising channels)
+- Polynomial: `x^24 + x^10 + x^9 + x^6 + x^4 + x^3 + x + 1` = `BLE_CRC24_POLY` (`0x00065B`)
+- Initial value: `BLE_CRC24_INIT_ADV` (`0x555555`) (for advertising channels)
 - Calculated over the PDU (header + payload), NOT over the preamble or access address
 
 ```c
+// BLE CRC24 named constants
+#define BLE_CRC24_INIT_ADV  0x555555  // Initial value for advertising channels
+#define BLE_CRC24_POLY      0x00065B  // Polynomial: x^24 + x^10 + x^9 + x^6 + x^4 + x^3 + x + 1
+
 // BLE CRC24 calculation
 uint32_t ble_crc24(const uint8_t *data, size_t len) {
-    uint32_t crc = 0x555555;  // Init value for advertising
+    uint32_t crc = BLE_CRC24_INIT_ADV;  // Init value for advertising
 
     for (size_t i = 0; i < len; i++) {
         uint8_t byte = data[i];
         for (int bit = 0; bit < 8; bit++) {
             if ((crc >> 23) ^ (byte & 1)) {
-                crc = (crc << 1) ^ 0x00065B;
+                crc = (crc << 1) ^ BLE_CRC24_POLY;
             } else {
                 crc = crc << 1;
             }
@@ -128,8 +134,8 @@ BLE applies a **data whitening** LFSR to the entire packet (PDU + CRC) to reduce
 ### Whitening LFSR
 
 - Polynomial: `x^7 + x^4 + 1`
-- Algorithm: **Galois LFSR** (left-shifting, checks bit 7, XOR `0x11`)
-- Seed: `swapbits(channel_number) | 2`
+- Algorithm: **Galois LFSR** (left-shifting, checks bit 7, XOR `BLE_WHITEN_POLY`=`0x11`)
+- Seed: `swapbits(channel_number) | 2` (equivalently, `swapbits(channel_number) | BLE_WHITEN_SEED_BIT`)
 
 The seed derivation and Galois LFSR algorithm are from Dmitry Grinberg's
 original "Bit-banging Bluetooth Low Energy" reference implementation,
@@ -141,16 +147,20 @@ lower 6 bits of the left-shifting LFSR state.  Bit 1 is set (`| 2`) to
 place position 1 in the 7-bit Galois register.
 
 ```c
+// BLE whitening named constants
+#define BLE_WHITEN_POLY      0x11  // Galois LFSR polynomial taps: x^7 + x^4 + 1 → bits 4 and 0
+#define BLE_WHITEN_SEED_BIT  0x02  // Bit 1 of the Galois LFSR seed (constant for all channels)
+
 // Galois LFSR whitening/dewhitening — symmetric (same function both ways)
 // Reference: Dmitry Grinberg, "Bit-banging Bluetooth Low Energy"
 //   http://dmitry.gr/index.php?r=05.Projects&proj=11.%20Bluetooth%20LE%20fakery
 void ble_whiten(uint8_t *data, size_t len, uint8_t channel) {
-    uint8_t lfsr = swapbits(channel) | 2;  // Galois LFSR seed
+    uint8_t lfsr = swapbits(channel) | BLE_WHITEN_SEED_BIT;  // Galois LFSR seed
 
     for (size_t i = 0; i < len; i++) {
         for (uint8_t m = 1; m; m <<= 1) {
             if (lfsr & 0x80) {
-                lfsr ^= 0x11;   // polynomial taps: x^4 (bit 4) and 1 (bit 0)
+                lfsr ^= BLE_WHITEN_POLY;  // polynomial taps: x^4 (bit 4) and 1 (bit 0)
                 data[i] ^= m;
             }
             lfsr <<= 1;
@@ -185,24 +195,31 @@ void nrf24_ble_mode_setup(uint8_t ble_channel) {
 
     // 1. Power down
     nrf24_write_reg(0x00, 0x00);  // CONFIG: power down, no CRC
+    // Typed: Config{.crc_mode=CrcMode::Disabled, .power_mode=PowerMode::Down, .primary=PrimaryMode::TX}.to_byte()
 
     // 2. Disable auto-ACK (raw packet, no ShockBurst)
     nrf24_write_reg(0x01, 0x00);  // EN_AA: all disabled
+    // Typed: EnAa{}.to_byte() with all pipes=false → 0x00
 
     // 3. Disable RX pipes
     nrf24_write_reg(0x02, 0x00);  // EN_RXADDR: none
+    // Typed: EnRxAddr{}.to_byte() with all pipes=false → 0x00
 
     // 4. Set address width to 4 bytes (BLE access address is 4 bytes)
     nrf24_write_reg(0x03, 0x02);  // SETUP_AW: 4 bytes
+    // Typed: SetupAw{.address_width=AddressWidth::Bytes4}.to_byte() → 0x02
 
     // 5. Disable retransmit
     nrf24_write_reg(0x04, 0x00);  // SETUP_RETR: disabled
+    // Typed: SetupRetr{.delay=AutoRetransmitDelay::Us250, .count=AutoRetransmitCount::Disabled}.to_byte() → 0x00
 
     // 6. Set RF channel
     nrf24_write_reg(0x05, nrf_channel);
+    // Typed: RfCh{.channel=nrf_channel}.to_byte()
 
     // 7. Set 1 Mbps, 0 dBm, NO LNA gain
     nrf24_write_reg(0x06, 0x06);  // RF_SETUP: 1Mbps, 0dBm
+    // Typed: RfSetup{.data_rate=DataRate::Mbps1, .tx_power=TxPower::dBm0}.to_byte() → 0x06
 
     // 8. Set TX address to BLE access address (byte-reversed!)
     //    BLE access address: 0x8E89BED6
@@ -213,6 +230,7 @@ void nrf24_ble_mode_setup(uint8_t ble_channel) {
     // 9. Disable NRF24 CRC (we calculate BLE CRC ourselves)
     //    CONFIG: PWR_UP=1, PRIM_RX=0, EN_CRC=0
     nrf24_write_reg(0x00, 0x02);  // Power up, TX mode, no CRC
+    // Typed: Config{.power_mode=PowerMode::Up, .primary=PrimaryMode::TX, .crc_mode=CrcMode::Disabled}.to_byte() → 0x02
     vTaskDelay(pdMS_TO_TICKS(2));
 }
 ```
@@ -290,6 +308,7 @@ void nrf24_send_ble_adv(const char *name, uint8_t ble_channel) {
     // Wait for TX complete
     vTaskDelay(pdMS_TO_TICKS(1));
     nrf24_write_reg(0x07, 0x70);  // Clear status flags
+    // Typed: Status{.rx_dr=true, .tx_ds=true, .max_rt=true}.to_byte() → 0x70
 }
 ```
 
