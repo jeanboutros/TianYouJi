@@ -17,6 +17,10 @@
 
 ## BLE Protocol
 - [Data whitening on nRF24L01+: bugs found, correct Galois LFSR, seed derivation](ble-data-whitening-nrf24.md)
+- [Ubertooth One as BLE test tool: USB commands, packet injection, dewhitening validation](ubertooth-ble-testing.md)
+
+## Hardware Tools
+- [Ubertooth One BLE testing: TX, sniffing, firmware validation](ubertooth-ble-testing.md)
 
 ## BLE (ESP32 Bluetooth Stack)
 - [BLE advertising with ESP-IDF: GAP API, non-connectable beacons](ble-advertising-esp32.md)
