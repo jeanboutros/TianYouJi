@@ -25,30 +25,37 @@ bool spi_comm_test(Driver &radio)
     printf("\n=== SPI Communication Test ===\n");
     bool all_pass = true;
 
-    /* ── Stage 1: Power-on reset (POR) value check ─────────────────────
+    /* ── Stage 1: SPI connectivity check ──────────────────────────────────
      *
-     * Read registers in their default state and compare against datasheet
-     * POR values.  If these don't match, the SPI bus is not working.
-     * Per nRF24L01+ Product Specification v1.0, Table 28 — Register Map.
+     * On a cold boot (power-on reset), all registers hold their POR
+     * default values and we can check them against the datasheet.
+     * However, after an ESP32 software reset, the nRF24 module stays
+     * powered and retains its previously programmed values — the POR
+     * check will falsely fail even though SPI is working perfectly.
      *
-     * We read STATUS first because it is the most reliable indicator:
-     * the nRF24L01+ returns STATUS as the first byte of EVERY SPI
-     * transaction (MISO during the command phase).  If we see 0xFF,
-     * MISO is stuck high (no device, or wiring broken).  If we see
-     * the expected 0x0E, SPI is definitely working. */
-    printf("Stage 1: Power-on reset register reads\n");
+     * Strategy: STATUS is the definitive SPI test because the nRF24
+     * returns it as the first byte of every SPI transaction (MISO
+     * during the command phase).  If STATUS reads correctly, SPI works.
+     * CONFIG is the second indicator: after a true POR, CONFIG=0x08;
+     * if it reads differently, the module was already configured.
+     *
+     * If STATUS passes but CONFIG is not POR, we know SPI works but
+     * the module was warm-booted — skip the full POR comparison and
+     * proceed directly to the write-verify test (Stage 2). */
+    printf("Stage 1: SPI connectivity check\n");
 
     /* STATUS — POR value 0x0E (RX_P_NO=111=empty, no IRQ flags, TX not full).
      * This is the single most definitive test: if STATUS reads correctly,
      * the SPI bus is working and the device is alive. */
+    bool spi_alive = false;
     {
         auto actual = radio.read_reg(Status{});
         uint8_t raw = actual.to_byte();
-        bool pass = (raw == Status::RESET_VALUE);
+        spi_alive = (raw == Status::RESET_VALUE);
         printf("  STATUS     exp=0x%02X  got=0x%02X  [%s]%s\n",
-               Status::RESET_VALUE, raw, pass ? "PASS" : "FAIL",
+               Status::RESET_VALUE, raw, spi_alive ? "PASS" : "FAIL",
                (raw == 0xFF) ? "  *** MISO stuck high — no device or bad wiring" : "");
-        if (!pass) {
+        if (!spi_alive) {
             printf("  SPI communication FAILED — cannot proceed.\n");
             printf("  Possible causes:\n");
             printf("    - MISO/MOSI/SCLK/CSN wiring incorrect\n");
@@ -59,88 +66,98 @@ bool spi_comm_test(Driver &radio)
         }
     }
 
-    /* CONFIG — POR value 0x08 (EN_CRC=1, CRCO=0, PWR_UP=0, PRIM_RX=0) */
-    {
-        auto actual = radio.read_reg(Config{});
-        bool pass = (actual.to_byte() == Config::RESET_VALUE);
+    /* CONFIG — detect warm boot: if CONFIG != POR, the module was
+     * previously programmed (ESP32 rebooted but nRF24 stayed powered).
+     * Skip the remaining POR checks and go straight to write-verify. */
+    auto actual_cfg = radio.read_reg(Config{});
+    bool warm_boot = (actual_cfg.to_byte() != Config::RESET_VALUE);
+    if (warm_boot) {
+        printf("  CONFIG     exp=0x%02X  got=0x%02X  [WARM BOOT]\n",
+               Config::RESET_VALUE, actual_cfg.to_byte());
+        printf("  Module was previously configured (ESP32 reset without power cycle).\n");
+        printf("  Skipping POR comparison — SPI is confirmed working by STATUS read.\n");
+        printf("  Stage 1 PASS (warm boot detected, SPI confirmed working).\n");
+        /* Proceed to Stage 2 write-verify which tests SPI regardless of
+         * previous register state */
+    } else {
+        /* Cold boot — check remaining POR defaults */
         printf("  CONFIG     exp=0x%02X  got=0x%02X  [%s]\n",
-               Config::RESET_VALUE, actual.to_byte(), pass ? "PASS" : "FAIL");
-        if (!pass) all_pass = false;
-    }
+               Config::RESET_VALUE, actual_cfg.to_byte(), "PASS");
+        all_pass = true;
 
-    /* EN_AA — POR value 0x3F (all pipes auto-ACK enabled) */
-    {
-        auto actual = radio.read_reg(EnAa{});
-        bool pass = (actual.to_byte() == EnAa::RESET_VALUE);
-        printf("  EN_AA      exp=0x%02X  got=0x%02X  [%s]\n",
-               EnAa::RESET_VALUE, actual.to_byte(), pass ? "PASS" : "FAIL");
-        if (!pass) all_pass = false;
-    }
+        /* EN_AA — POR value 0x3F (all pipes auto-ACK enabled) */
+        {
+            auto actual = radio.read_reg(EnAa{});
+            bool pass = (actual.to_byte() == EnAa::RESET_VALUE);
+            printf("  EN_AA      exp=0x%02X  got=0x%02X  [%s]\n",
+                   EnAa::RESET_VALUE, actual.to_byte(), pass ? "PASS" : "FAIL");
+            if (!pass) all_pass = false;
+        }
 
-    /* EN_RXADDR — POR value 0x03 (pipes 0 and 1 enabled) */
-    {
-        auto actual = radio.read_reg(EnRxAddr{});
-        bool pass = (actual.to_byte() == EnRxAddr::RESET_VALUE);
-        printf("  EN_RXADDR  exp=0x%02X  got=0x%02X  [%s]\n",
-               EnRxAddr::RESET_VALUE, actual.to_byte(), pass ? "PASS" : "FAIL");
-        if (!pass) all_pass = false;
-    }
+        /* EN_RXADDR — POR value 0x03 (pipes 0 and 1 enabled) */
+        {
+            auto actual = radio.read_reg(EnRxAddr{});
+            bool pass = (actual.to_byte() == EnRxAddr::RESET_VALUE);
+            printf("  EN_RXADDR  exp=0x%02X  got=0x%02X  [%s]\n",
+                   EnRxAddr::RESET_VALUE, actual.to_byte(), pass ? "PASS" : "FAIL");
+            if (!pass) all_pass = false;
+        }
 
-    /* SETUP_AW — POR value 0x03 (5-byte address width) */
-    {
-        auto actual = radio.read_reg(SetupAw{});
-        bool pass = (actual.to_byte() == SetupAw::RESET_VALUE);
-        printf("  SETUP_AW   exp=0x%02X  got=0x%02X  [%s]\n",
-               SetupAw::RESET_VALUE, actual.to_byte(), pass ? "PASS" : "FAIL");
-        if (!pass) all_pass = false;
-    }
+        /* SETUP_AW — POR value 0x03 (5-byte address width) */
+        {
+            auto actual = radio.read_reg(SetupAw{});
+            bool pass = (actual.to_byte() == SetupAw::RESET_VALUE);
+            printf("  SETUP_AW   exp=0x%02X  got=0x%02X  [%s]\n",
+                   SetupAw::RESET_VALUE, actual.to_byte(), pass ? "PASS" : "FAIL");
+            if (!pass) all_pass = false;
+        }
 
-    /* SETUP_RETR — POR value 0x03 (250 µs delay, 3 retransmits) */
-    {
-        auto actual = radio.read_reg(SetupRetr{});
-        bool pass = (actual.to_byte() == SetupRetr::RESET_VALUE);
-        printf("  SETUP_RETR exp=0x%02X  got=0x%02X  [%s]\n",
-               SetupRetr::RESET_VALUE, actual.to_byte(), pass ? "PASS" : "FAIL");
-        if (!pass) all_pass = false;
-    }
+        /* SETUP_RETR — POR value 0x03 (250 µs delay, 3 retransmits) */
+        {
+            auto actual = radio.read_reg(SetupRetr{});
+            bool pass = (actual.to_byte() == SetupRetr::RESET_VALUE);
+            printf("  SETUP_RETR exp=0x%02X  got=0x%02X  [%s]\n",
+                   SetupRetr::RESET_VALUE, actual.to_byte(), pass ? "PASS" : "FAIL");
+            if (!pass) all_pass = false;
+        }
 
-    /* RF_CH — POR value 0x02 per datasheet Table 28; bit 7 is reserved */
-    {
-        auto actual = radio.read_reg(RfCh{});
-        bool pass = (actual.to_byte() & REG_MASK_RF_CH) == (RfCh::RESET_VALUE & REG_MASK_RF_CH);
-        printf("  RF_CH      exp=0x%02X  got=0x%02X  [%s]\n",
-                RfCh::RESET_VALUE & REG_MASK_RF_CH,
-                actual.to_byte() & REG_MASK_RF_CH, pass ? "PASS" : "FAIL");
-        if (!pass) all_pass = false;
-    }
+        /* RF_CH — POR value 0x02 per datasheet Table 28; bit 7 is reserved */
+        {
+            auto actual = radio.read_reg(RfCh{});
+            bool pass = (actual.to_byte() & REG_MASK_RF_CH) == (RfCh::RESET_VALUE & REG_MASK_RF_CH);
+            printf("  RF_CH      exp=0x%02X  got=0x%02X  [%s]\n",
+                    RfCh::RESET_VALUE & REG_MASK_RF_CH,
+                    actual.to_byte() & REG_MASK_RF_CH, pass ? "PASS" : "FAIL");
+            if (!pass) all_pass = false;
+        }
 
-    /* RF_SETUP — POR value 0x0E (2 Mbps, 0 dBm); bits 6 and 0 reserved */
-    {
-        auto actual = radio.read_reg(RfSetup{});
-        bool pass = (actual.to_byte() & REG_MASK_RF_SETUP) == (RfSetup::RESET_VALUE & REG_MASK_RF_SETUP);
-        printf("  RF_SETUP   exp=0x%02X  got=0x%02X  [%s]\n",
-               RfSetup::RESET_VALUE & REG_MASK_RF_SETUP,
-               actual.to_byte() & REG_MASK_RF_SETUP, pass ? "PASS" : "FAIL");
-        if (!pass) all_pass = false;
-    }
+        /* RF_SETUP — POR value 0x0E (2 Mbps, 0 dBm); bits 6 and 0 reserved */
+        {
+            auto actual = radio.read_reg(RfSetup{});
+            bool pass = (actual.to_byte() & REG_MASK_RF_SETUP) == (RfSetup::RESET_VALUE & REG_MASK_RF_SETUP);
+            printf("  RF_SETUP   exp=0x%02X  got=0x%02X  [%s]\n",
+                    RfSetup::RESET_VALUE & REG_MASK_RF_SETUP,
+                    actual.to_byte() & REG_MASK_RF_SETUP, pass ? "PASS" : "FAIL");
+            if (!pass) all_pass = false;
+        }
 
-    /* FIFO_STATUS — POR value 0x11 (TX_EMPTY=1, RX_EMPTY=1); read-only but
-     * value should be consistent at power-on. */
-    {
-        auto actual = radio.read_reg(FifoStatus{});
-        bool pass = (actual.to_byte() == FifoStatus::RESET_VALUE);
-        printf("  FIFO_STAT  exp=0x%02X  got=0x%02X  [%s]\n",
-               FifoStatus::RESET_VALUE, actual.to_byte(), pass ? "PASS" : "FAIL");
-        if (!pass) all_pass = false;
-    }
+        /* FIFO_STATUS — POR value 0x11 (TX_EMPTY=1, RX_EMPTY=1) */
+        {
+            auto actual = radio.read_reg(FifoStatus{});
+            bool pass = (actual.to_byte() == FifoStatus::RESET_VALUE);
+            printf("  FIFO_STAT  exp=0x%02X  got=0x%02X  [%s]\n",
+                    FifoStatus::RESET_VALUE, actual.to_byte(), pass ? "PASS" : "FAIL");
+            if (!pass) all_pass = false;
+        }
 
-    if (!all_pass) {
-        printf("\n  Stage 1 FAILED — POR values do not match.\n");
-        printf("  SPI reads are unreliable; cannot proceed to write test.\n\n");
-        return false;
-    }
+        if (!all_pass) {
+            printf("\n  Stage 1 FAILED — POR values do not match datasheet.\n");
+            printf("  SPI reads are unreliable; cannot proceed to write test.\n\n");
+            return false;
+        }
 
-    printf("  Stage 1 PASS — all POR values match datasheet.\n");
+        printf("  Stage 1 PASS — all POR values match datasheet.\n");
+    }
 
     /* ── Stage 2: Write-verify test ──────────────────────────────────────
      *
