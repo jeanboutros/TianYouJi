@@ -7,12 +7,14 @@ Status: `[ ]` pending, `[~]` active, `[x]` done, `[!]` blocked
 
 ## Active
 
-- [~] **Review Pipeline** — Sessions 1-6 primary + dewhiten fix done; challenger pass 3/6 done (SW, HW, wireless)
+- [~] **Review Pipeline** — Sessions 1-6 primary + dewhiten fix done; challenger pass 3/6 done (SW, HW, wireless); Phase C structured diagnostics review in progress
 
 ---
 
 ## Backlog
 
+- [ ] **HIGH: Replace ESP_ERROR_CHECK in Hal::spi_xfer() with error propagation** — Phase C finding F-1. `ESP_ERROR_CHECK` causes `abort()` on any SPI transfer failure, defeating the diagnostic retry architecture. Requires changing `spi_xfer()` from `void` to return `bool`, propagating through all Driver methods, and updating all callers. (Security reviewer, severity HIGH)
+- [ ] *See also F-4:* `EspIdfHal::init()` uses `ESP_ERROR_CHECK` for initialization (appropriate) but has no RAII destructor for cleanup — medium severity, pre-existing.
 - [ ] **BUG: Remove MOSI GPIO_MODE_INPUT from main.cpp:133** — Challenger confirmed this breaks all SPI writes after init (switch_channel, clear_irq). Must remove lines 132-134.
 - [ ] Challenger pass reviews: security, test, docs, memory-safety (4 remaining)
 - [ ] Session 7: HAL adapter review (`components/nrf24_espidf/`)
@@ -34,6 +36,7 @@ Status: `[ ]` pending, `[~]` active, `[x]` done, `[!]` blocked
 
 ## Done
 
+- [x] **Structured diagnostics module** — `diag_boot.h` with `DiagPhase`, `DiagResult`, `DiagFullResult`, `DiagOpts`, and `full_boot_diagnostic()`. 7 hardware verification criteria PASS: power-on delay, independent address verification, EN_AA/EN_CRC write order, CE GPIO readback, warm boot handling, clone detection, self-consistent error detection. Build passes with zero warnings. (Phase C: HW engineer APPROVED, security reviewer CONDITIONAL — F-1 `ESP_ERROR_CHECK` in `spi_xfer` is HIGH, tracked in Backlog)
 - [x] BLE dewhiten() fix: bit-swap + Galois LFSR + correct seed (Dmitry Grinberg reference)
 - [x] swapbits() utility function added to ble.h
 - [x] Host-side unit tests for swapbits() and dewhiten() (23 tests, all passing, ASAN enabled)
@@ -69,6 +72,10 @@ Status: `[ ]` pending, `[~]` active, `[x]` done, `[!]` blocked
 | D9 | 2026-06-06 | Challenger HW-engineer found MOSI direction bug (C-2) | main.cpp:133 sets MOSI to INPUT, breaks all post-init SPI writes |
 | D10 | 2026-06-06 | Challenger HW-engineer confirmed access address byte order CORRECT | ADV_ACCESS_ADDR already in LSByte-first nRF24 SPI order |
 | D11 | 2026-06-06 | Challenger wireless-expert APPROVED dewhiten (no critical defects) | Galois LFSR, seed, bit-swap pipeline all verified correct |
+| D12 | 2026-06-06 | Structured diagnostics module COMPLETE — 7 HW verification criteria PASS | Phase C: HW APPROVED, Security CONDITIONAL (F-1 spi_xfer abort) |
+| D13 | 2026-06-06 | F-1 (HIGH): `ESP_ERROR_CHECK` in `spi_xfer()` causes `abort()` on SPI failure | Defeats diagnostic retry architecture; needs `bool` return propagation |
+| D14 | 2026-06-06 | F-4 (MEDIUM, pre-existing): `EspIdfHal::init()` has no RAII destructor | Cleanup on init failure not guaranteed |
+| D15 | 2026-06-06 | F-2..F-6 (LOW): Silent truncation, uint8_t retry limit, retry w/o re-init (correct), no secrets | Non-blocking advisory flags — no code changes required |
 
 ---
 
@@ -80,3 +87,5 @@ Status: `[ ]` pending, `[~]` active, `[x]` done, `[!]` blocked
 | 006 | wireless-expert | 2026-06-06 | `docs/pipeline/logs/006-ubertooth-dewhiten-test-plan.md` |
 | 007 | test-engineer | 2026-06-06 | `docs/pipeline/logs/007-dewhiten-unit-tests.md` |
 | 008 | docs-writer | 2026-06-06 | `docs/pipeline/logs/008-ble-whitening-doc.md` |
+| 014 | hardware-engineer | 2026-06-06 | Phase C: Structured diagnostics HW verification (APPROVED) |
+| 015 | security-reviewer | 2026-06-06 | Phase C: Structured diagnostics security review (CONDITIONAL PASS) |

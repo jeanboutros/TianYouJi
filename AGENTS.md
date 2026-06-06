@@ -431,3 +431,24 @@ After fixing any nRF24L01+ bug, you MUST ask:
 - Why was this bug missed?
 - What procedural safeguard would have caught it?
 - Update the skill or the relevant learning doc with the lesson.
+
+### Structured diagnostics module
+
+The project now uses `nrf24::diag::full_boot_diagnostic()` (in `diag_boot.h`) instead of the old boolean `spi_comm_test()` + `verify_ble_rx()` sequence. The structured module provides:
+
+- **6 phased checks**: HalInit → SpiComm → BleConfig → CeState → WarmBoot → ExtendedTest
+- **Typed results**: `DiagResult` per phase (pass/fail/skip + detail message), `DiagFullResult` aggregate
+- **Configurable retries**: `DiagOpts::max_retries` (default 3), `DiagOpts::verbose` for detailed output
+- **7 hardware verification criteria PASS**: power-on delay, independent address verification, EN_AA/EN_CRC write order, CE GPIO readback, warm boot handling, clone detection, self-consistent error detection
+
+The old `verify_spi_comm()` and `verify_ble_rx()` functions are still available as backward-compatible wrappers but are marked `@deprecated` in favor of `full_boot_diagnostic()`.
+
+### Known issue: ESP_ERROR_CHECK in spi_xfer()
+
+**Severity: HIGH** (Phase C security reviewer finding F-1)
+
+`EspIdfHal::spi_xfer()` uses `ESP_ERROR_CHECK()` on `spi_device_polling_transmit()`, which calls `abort()` on any SPI transfer failure. This defeats the diagnostic retry architecture — a transient SPI error should be propagated as `false` so the caller can retry, not crash the entire firmware.
+
+**Required fix**: Change `Hal::spi_xfer()` from `void` to return `bool`, propagate the result through all `Driver` methods, and update all callers in `main.cpp` and `diag_boot.cpp`. The `EspIdfHal` implementation should return `false` on SPI errors instead of aborting.
+
+This is tracked in `docs/pipeline/TODO.md` Backlog.
