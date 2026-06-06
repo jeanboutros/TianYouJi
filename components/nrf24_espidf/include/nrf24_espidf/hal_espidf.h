@@ -27,7 +27,7 @@ struct EspIdfPins {
  * @code
  *   nrf24::EspIdfHal hal;
  *   hal.init({ .miso=GPIO_NUM_19, .mosi=GPIO_NUM_23, .sclk=GPIO_NUM_18,
- *              .csn=GPIO_NUM_17, .ce=GPIO_NUM_5, .spi_host=SPI3_HOST });
+ *              .csn=GPIO_NUM_17, .ce=GPIO_NUM_4, .spi_host=SPI3_HOST });
  *   nrf24::Driver radio(hal);
  * @endcode
  */

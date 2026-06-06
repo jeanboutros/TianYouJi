@@ -37,7 +37,7 @@ static constexpr gpio_num_t PIN_MISO = GPIO_NUM_19;
 static constexpr gpio_num_t PIN_MOSI = GPIO_NUM_23;
 static constexpr gpio_num_t PIN_SCLK = GPIO_NUM_18;
 static constexpr gpio_num_t PIN_CSN  = GPIO_NUM_17;
-static constexpr gpio_num_t PIN_CE   = GPIO_NUM_5;
+static constexpr gpio_num_t PIN_CE   = GPIO_NUM_4;
 
 /** @brief Maximum nRF24L01+ payload size in bytes (FIFO width, not BLE PDU limit). */
 static constexpr uint8_t NRF24_MAX_PAYLOAD = 32;

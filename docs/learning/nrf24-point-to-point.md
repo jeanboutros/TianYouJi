@@ -22,8 +22,8 @@ GPIO 23 (MOSI) ──┬── Module A: MOSI
 
 Separate control lines:
 GPIO 17 (CSN_A) ───── Module A: CSN
-GPIO 5  (CE_A)  ───── Module A: CE
-GPIO 4  (CSN_B) ───── Module B: CSN
+GPIO 4  (CE_A)  ───── Module A: CE
+GPIO 2  (CSN_B) ───── Module B: CSN
 GPIO 16 (CE_B)  ───── Module B: CE
 
 Power:
@@ -237,8 +237,8 @@ void nrf24_read_payload(uint8_t *buf, uint8_t len) {
 Since both modules share the SPI bus, we register two SPI devices:
 
 ```c
-spi_device_handle_t nrf_tx;  // Module A (CSN=GPIO17, CE=GPIO5)
-spi_device_handle_t nrf_rx;  // Module B (CSN=GPIO4, CE=GPIO16)
+spi_device_handle_t nrf_tx;  // Module A (CSN=GPIO17, CE=GPIO4)
+spi_device_handle_t nrf_rx;  // Module B (CSN=GPIO2, CE=GPIO16)
 
 void init_both_modules(void) {
     // Initialize shared SPI bus (once)
@@ -266,14 +266,14 @@ void init_both_modules(void) {
     spi_device_interface_config_t dev_b = {
         .clock_speed_hz = 8000000,
         .mode = 0,
-        .spics_io_num = 4,    // CSN_B
+        .spics_io_num = 2,    // CSN_B
         .queue_size = 1,
         .command_bits = 8,
     };
     spi_bus_add_device(SPI3_HOST, &dev_b, &nrf_rx);
 
     // Configure CE pins
-    gpio_set_direction(5, GPIO_MODE_OUTPUT);   // CE_A
+    gpio_set_direction(4, GPIO_MODE_OUTPUT);   // CE_A
     gpio_set_direction(16, GPIO_MODE_OUTPUT);  // CE_B
 }
 ```
