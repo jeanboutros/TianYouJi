@@ -48,6 +48,8 @@ This project uses a 3-phase validation pipeline for all non-trivial changes.
 | `grill-me` | Adversarial review (Dual-Model Challenge) | Phase A & C |
 | `nrf24l01plus` | nRF24L01+ chip-specific traps and diagnostics | All agents touching nRF24 code |
 | `memory-safety` | C++ memory leak, RAII, ASAN, heap/stack safety | All agents |
+| `ubertooth` | Ubertooth One BLE testing and cross-validation (TX/RX, firmware update, dewhitening validation) | All agents using Ubertooth or cross-validation |
+| `nrf52840-sniffer` | Nordic nRF52840 Dongle BLE sniffer for cross-validation (Wireshark extcap, PDU comparison) | All agents using nRF Sniffer or cross-validation |
 
 ### Pipeline Summary
 
