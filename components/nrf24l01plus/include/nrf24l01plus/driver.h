@@ -6,6 +6,20 @@
 namespace nrf24 {
 
 /**
+ * @brief Maximum payload size in bytes for the nRF24L01+ FIFO.
+ *
+ * The nRF24L01+ RX and TX FIFOs each hold up to 32 bytes per packet.
+ * This is a hardware limit: the RX_PW_Px registers accept values 0–32,
+ * and read_payload() / write_payload() transfer at most this many bytes.
+ *
+ * @code
+ *   uint8_t buf[nrf24::MAX_PAYLOAD];
+ *   radio.read_payload(buf, nrf24::MAX_PAYLOAD);
+ * @endcode
+ */
+static constexpr uint8_t MAX_PAYLOAD = 32;
+
+/**
  * @brief Platform-independent driver for the nRF24L01+ transceiver.
  *
  * All hardware access is delegated to a Hal implementation supplied at
@@ -68,7 +82,7 @@ public:
      * On SPI failure, `buf` contents are undefined.
      *
      * @param buf  Destination buffer (must be >= len bytes).
-     * @param len  Number of payload bytes to read (1-32).
+     * @param len  Number of payload bytes to read (1–nrf24::MAX_PAYLOAD).
      * @return     true if the SPI transfer succeeded, false on SPI failure.
      */
     bool read_payload(uint8_t *buf, uint8_t len);

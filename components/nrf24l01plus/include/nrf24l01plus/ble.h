@@ -65,10 +65,10 @@ inline uint8_t swapbits(uint8_t v)
  *
  * @code
  *   // Full RX pipeline for a packet on BLE advertising channel 37:
- *   uint8_t buf[32];
- *   radio.read_payload(buf, 32);
+ *   uint8_t buf[nrf24::MAX_PAYLOAD];
+ *   radio.read_payload(buf, nrf24::MAX_PAYLOAD);
  *   // dewhiten internally: bit-swap each byte, then Galois LFSR XOR
- *   nrf24::ble::dewhiten(buf, 32, 37);
+ *   nrf24::ble::dewhiten(buf, nrf24::MAX_PAYLOAD, 37);
  *   // buf[] now holds the original BLE PDU bytes (LSbit-first format)
  * @endcode
  *

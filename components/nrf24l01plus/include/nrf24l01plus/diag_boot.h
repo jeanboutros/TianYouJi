@@ -4,8 +4,7 @@
  * @file diag_boot.h
  * @brief Structured boot-time diagnostic phases for the nRF24L01+ driver.
  *
- * Provides a typed, phased diagnostic sequence that replaces the boolean
- * spi_comm_test() and verify_ble_rx() functions with structured results
+ * Provides a typed, phased diagnostic sequence with structured results
  * (status, detail, timing).  Each phase can be run independently or as
  * part of full_boot_diagnostic().
  *

@@ -45,10 +45,8 @@ void EspIdfHal::init(const EspIdfPins &pins)
      * mode, gpio_get_level() always returns 0 regardless of the
      * driven level (ESP-IDF GPIO driver documentation).
      *
-     * Note: CE was previously on GPIO5, which is SPI3_HOST's native
-     * IO_MUX CS0 pin.  Setting PIN_FUNC_GPIO disconnects the IO_MUX
-     * CS0 signal from the pad, but CE has been migrated to GPIO4 to
-     * eliminate this overlap entirely. */
+     * GPIO4 is used for CE to avoid overlap with SPI3_HOST's native
+     * IO_MUX CS0 pin on GPIO5. */
     gpio_config_t gpio_cfg = {
         .pin_bit_mask   = (1ULL << pins.ce),
         .mode           = GPIO_MODE_INPUT_OUTPUT,

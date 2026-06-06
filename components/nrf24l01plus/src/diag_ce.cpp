@@ -367,14 +367,14 @@ DiagPhaseResult verify_extended_ce(Driver &radio,
 
         /* If FIFO has data, drain it */
         if (fifo_has_data) {
-            uint8_t buf[32];
-            radio.read_payload(buf, 32);
+            uint8_t buf[MAX_PAYLOAD];
+            radio.read_payload(buf, MAX_PAYLOAD);
             ble::clear_irq_flags(radio);
             radio.flush_rx();
 
             if (verbosity >= DiagVerbosity::Detailed) {
                 printf("[diag:phase5]   payload drained:");
-                for (int j = 0; j < 32; j++) {
+                for (int j = 0; j < MAX_PAYLOAD; j++) {
                     printf(" %02X", buf[j]);
                 }
                 printf("\n");

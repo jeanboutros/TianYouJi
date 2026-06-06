@@ -77,7 +77,7 @@ inline constexpr uint8_t ADV_ACCESS_ADDR[4] = {0x71, 0x91, 0x7D, 0x6B};
 struct RxConfig {
     uint8_t initial_channel_idx = 0; ///< Index into ADV_CHANNELS (0–2) for initial tune
 
-    uint8_t payload_width = 32;      ///< Fixed payload width (bytes, 1–32)
+    uint8_t payload_width = nrf24::MAX_PAYLOAD; ///< Fixed payload width (bytes, 1–MAX_PAYLOAD)
 
     uint16_t scan_duration_ms = 50;  ///< Time to listen on each channel before rotating (ms)
 
@@ -287,8 +287,8 @@ inline bool rx_available(Driver &radio)
  *
  * @code
  *   if (nrf24::ble::rx_fifo_not_empty(radio)) {
- *       uint8_t buf[32];
- *       radio.read_payload(buf, 32);
+ *       uint8_t buf[nrf24::MAX_PAYLOAD];
+ *       radio.read_payload(buf, nrf24::MAX_PAYLOAD);
  *   }
  * @endcode
  *
