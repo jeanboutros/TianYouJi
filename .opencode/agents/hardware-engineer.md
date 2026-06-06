@@ -71,3 +71,10 @@ ROUTING: [if rejected: code-architect]
 - NEVER invent hardware behaviour
 - ALWAYS cite datasheet page/table for each claim
 - If ambiguous, use the assumption-trap protocol
+
+## Self-Reflection Clause
+
+After fixing any bug or resolving any issue that required debugging, you MUST ask:
+1. **Why was this bug missed?** — What review, test, or protocol gap allowed it through?
+2. **What procedural safeguard would have caught it?** — What specific check, test, or verification step would have prevented it?
+3. **Update the knowledge base** — Add the lesson to the relevant skill (`/home/huyang/projects/esp32/.opencode/skills/nrf24l01plus/SKILL.md` for nRF24 hardware bugs, or the appropriate learning doc in `docs/learning/`) so the same class of bug is caught earlier next time.
