@@ -21,12 +21,16 @@ void EspIdfHal::init(const EspIdfPins &pins)
     bus_cfg.max_transfer_sz = 33;
     ESP_ERROR_CHECK(spi_bus_initialize(pins.spi_host, &bus_cfg, SPI_DMA_DISABLED));
 
-    /* SPI device: 8-bit command, mode 0, 8 MHz */
+    /* SPI device: 8-bit command, mode 0, 1 MHz.
+     * 1 MHz chosen for clone chip (Si24R1, BK2425) compatibility.
+     * Genuine nRF24L01+ supports up to 10 MHz, but clones often
+     * misinterpret register writes above 1–2 MHz, causing silent
+     * configuration failures.  1 MHz is safe for all known variants. */
     spi_device_interface_config_t dev_cfg = {};
     dev_cfg.command_bits   = 8;
     dev_cfg.address_bits   = 0;
     dev_cfg.mode           = 0;
-    dev_cfg.clock_speed_hz = 8000000;
+    dev_cfg.clock_speed_hz = 1000000;
     dev_cfg.spics_io_num   = pins.csn;
     dev_cfg.queue_size     = 1;
     ESP_ERROR_CHECK(spi_bus_add_device(pins.spi_host, &dev_cfg, &spi_handle_));

@@ -33,3 +33,4 @@
 ## Debugging
 - [MOSI SPI pin direction bug, register verification, and multi-agent review findings](mosi-spi-register-verification.md)
 - [nRF24L01+ EN_AA/EN_CRC register write order trap: CRC override, 0xFE FIFO artifacts, clone detection](nrf24-enaa-encrc-override.md)
+- [nRF24L01+ SPI communication failure & clone chip diagnostic: 3-stage test, clock speed, Si24R1](nrf24-spi-clone-chip-diagnostic.md)

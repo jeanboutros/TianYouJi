@@ -349,6 +349,16 @@ extern "C" void app_main(void)
     });
     printf("NRF24L01 driver initialized\n");
 
+    /* Test SPI communication before any register configuration.
+     * This reads power-on reset values and performs write-verify tests
+     * to confirm the SPI bus is working.  Also detects clone chips. */
+    bool spi_ok = nrf24::diag::spi_comm_test(radio);
+    if (!spi_ok) {
+        printf("SPI communication test FAILED — halting.\n");
+        printf("Check wiring, power, and module compatibility.\n");
+        return;
+    }
+
     nrf24::ble::configure_rx(radio);
     printf("NRF24L01 configured for BLE passive RX\n");
 
