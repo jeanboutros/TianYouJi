@@ -402,3 +402,46 @@ For a CLI shell (when launching `idf.py` outside the activate script), also expo
 export IDF_TOOLS_PATH=$HOME/.espressif
 export IDF_PYTHON_ENV_PATH=$HOME/.espressif/tools/python/v6.0.1/venv
 ```
+
+## nRF24L01+ Register Write Order — CRITICAL
+
+### The EN_AA / EN_CRC Override Trap
+
+When configuring the nRF24L01+ for BLE passive reception, **EN_AA MUST be written to 0x00 BEFORE CONFIG is written with EN_CRC=0**.
+
+The nRF24L01+ datasheet states: *"If the EN_AA is set for any pipe, the EN_CRC bit in the CONFIG register is forced high."*
+
+The power-on reset value of EN_AA is **0x3F** (all pipes auto-ACK enabled). If CONFIG is written with EN_CRC=0 while EN_AA is still 0x3F:
+1. The hardware overrides EN_CRC to 1 internally
+2. After clearing EN_AA=0x00, the stored CONFIG value **still has EN_CRC=1**
+3. The nRF24 now expects CRC in every received packet
+4. BLE packets use CRC-24 (3 bytes), not nRF24's CRC-1/CRC-2 (1–2 bytes)
+5. **Every BLE packet fails CRC check and is silently discarded**
+6. The RX FIFO stays empty; `read_payload()` returns 0xFE (power-on default)
+
+### Symptom Pattern
+
+| Symptom | Cause |
+|---------|-------|
+| RX FIFO always 0xFE | CRC rejection → no valid packets reach FIFO |
+| RX_DR set but no real data | FIFO read from empty buffer returns 0xFE |
+| RPD signal very rare (0.1%) | nRF24 can detect RF energy but can't demodulate with wrong CRC |
+| Channel-dependent "MACs" after dewhitening | 0xFE × 32 dewhittened produces fake but deterministic PDUs |
+
+### Prevention
+
+```cpp
+// BROKEN — CONFIG written before EN_AA
+radio.write_reg(cfg);       // EN_CRC=0 → OVERRIDDEN to 1 because EN_AA=0x3F
+radio.write_reg(en_aa);     // EN_AA=0x00 → too late, CONFIG already stored with EN_CRC=1
+
+// CORRECT — EN_AA zeroed first
+radio.write_reg(en_aa);     // EN_AA=0x00 → no forcing condition exists
+radio.write_reg(cfg);       // EN_CRC=0 → accepted as-is
+```
+
+### Clone Chip Detection
+
+On genuine nRF24L01+, writing EN_AA=0x00 then CONFIG with EN_CRC=0 works correctly.
+On Si24R1 clone chips, the CRC forcing may persist even after EN_AA=0x00.
+Always read back CONFIG after writing and verify EN_CRC matches the intended value.
