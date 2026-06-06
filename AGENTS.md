@@ -46,6 +46,7 @@ This project uses a 3-phase validation pipeline for all non-trivial changes.
 | `verification-before-completion` | No claims without fresh build evidence | All agents |
 | `brainstorming` | Structured design before code — hard gate | All (Phase A) |
 | `grill-me` | Adversarial review (Dual-Model Challenge) | Phase A & C |
+| `nrf24l01plus` | nRF24L01+ chip-specific traps and diagnostics | All agents touching nRF24 code |
 | `memory-safety` | C++ memory leak, RAII, ASAN, heap/stack safety | All agents |
 
 ### Pipeline Summary
