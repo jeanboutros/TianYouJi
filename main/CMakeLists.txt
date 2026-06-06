@@ -1,4 +1,4 @@
-idf_component_register(SRCS "main.cpp"
+idf_component_register(SRCS "main.cpp" "ble_sniffer.cpp"
                        PRIV_REQUIRES esp_driver_gpio esp_hw_support esp_timer nrf24l01plus nrf24_espidf
                        INCLUDE_DIRS "")
 
