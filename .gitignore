@@ -7,3 +7,4 @@ sdkconfig.old
 # IDF diagnostic and log files
 idf-diag-*/
 log/
+docs/pipeline/scripts/__pycache__/
