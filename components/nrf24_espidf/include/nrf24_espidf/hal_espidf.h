@@ -34,6 +34,14 @@ struct EspIdfPins {
 class EspIdfHal final : public Hal {
 public:
     /**
+     * @brief Destructor — defaulted to allow safe deletion via Hal pointer.
+     *
+     * The base Hal destructor is virtual, so destroying through a base
+     * pointer correctly invokes the derived destructor.
+     */
+    ~EspIdfHal() override = default;
+
+    /**
      * @brief Initialise the SPI bus, device, and CE GPIO.
      *
      * @param pins  Pin assignment and SPI host selection.

@@ -103,13 +103,15 @@ struct RxConfig {
     /**
      * @brief Total number of channels in the scan sequence.
      *
-     * Returns 3 (advertising) + extra_channel_count.
+     * Returns 3 (advertising) + extra_channel_count, clamped to 255
+     * to prevent uint8_t overflow if extra_channel_count exceeds 252.
      *
-     * @return Total channel count for one full scan cycle.
+     * @return Total channel count for one full scan cycle (max 255).
      */
     constexpr uint8_t total_channels() const
     {
-        return static_cast<uint8_t>(3 + extra_channel_count);
+        uint16_t total = static_cast<uint16_t>(3) + static_cast<uint16_t>(extra_channel_count);
+        return static_cast<uint8_t>(total > 255 ? 255 : total);
     }
 
     /**
@@ -117,12 +119,17 @@ struct RxConfig {
      *
      * Positions 0–2 map to the advertising channels (37, 38, 39).
      * Positions 3+ map to entries in extra_channels[].
+     * If @p seq_idx is out of range (>= total_channels()), returns the
+     * first advertising channel (ch37) as a safe default.
      *
      * @param seq_idx  Position in the scan sequence (0 to total_channels()-1).
-     * @return         BLE channel index (0–39).
+     * @return         BLE channel index (0–39), or ADV_CHANNELS[0].ch_idx on out-of-range.
      */
     constexpr uint8_t channel_at(uint8_t seq_idx) const
     {
+        if (seq_idx >= total_channels()) {
+            return ADV_CHANNELS[0].ch_idx;
+        }
         if (seq_idx < 3) return ADV_CHANNELS[seq_idx].ch_idx;
         return extra_channels[seq_idx - 3];
     }
