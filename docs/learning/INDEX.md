@@ -19,6 +19,7 @@
 
 ## BLE Protocol
 - [Data whitening on nRF24L01+: bugs found, correct Galois LFSR, seed derivation](ble-data-whitening-nrf24.md)
+- [BLE sniffer architecture: advertising basics, SPI-to-packet pipeline, PDU parsing](ble-sniffer-architecture.md)
 - [Ubertooth One as BLE test tool: USB commands, packet injection, dewhitening validation](ubertooth-ble-testing.md)
 
 ## Hardware Tools
