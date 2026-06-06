@@ -5,6 +5,26 @@ namespace ble {
 
 void configure_rx(Driver &radio, const RxConfig &config)
 {
+    /* MUST disable auto-ACK BEFORE writing CONFIG.
+     *
+     * Per nRF24L01+ datasheet §CONFIG: "If the EN_AA is set for any
+     * pipe, the EN_CRC bit in the CONFIG register is forced high."
+     *
+     * The power-on reset value of EN_AA is 0x3F (all pipes enabled).
+     * If CONFIG is written with EN_CRC=0 while EN_AA is non-zero, the
+     * hardware overrides EN_CRC to 1.  After clearing EN_AA, the stored
+     * CONFIG value still has EN_CRC=1 and must be re-written.
+     *
+     * Writing EN_AA=0x00 first avoids this override entirely:
+     * @code
+     *   // BEFORE (broken): write CONFIG → EN_CRC forced to 1 → then EN_AA=0
+     *   // AFTER  (fixed): write EN_AA=0 → then CONFIG → EN_CRC accepted as 0
+     * @endcode
+     */
+    EnAa en_aa;
+    for (int i = 0; i < 6; ++i) en_aa.pipe[i] = false;
+    radio.write_reg(en_aa);
+
     /* Power up, PRX mode, CRC disabled (BLE handles its own CRC) */
     Config cfg;
     cfg.power_mode   = PowerMode::Up;
@@ -14,10 +34,21 @@ void configure_rx(Driver &radio, const RxConfig &config)
     cfg.irq_mask     = IrqMask::None;
     radio.write_reg(cfg);
 
-    /* Disable auto-ACK on all pipes */
-    EnAa en_aa;
-    for (int i = 0; i < 6; ++i) en_aa.pipe[i] = false;
-    radio.write_reg(en_aa);
+    /* Verify CONFIG actually took EN_CRC=0 (critical for BLE).
+     *
+     * On genuine nRF24L01+, this should succeed because we already
+     * cleared EN_AA above.  On some clone chips (Si24R1), the EN_CRC
+     * forcing may persist — if verification fails, re-write CONFIG
+     * and check again to confirm the hardware accepted it. */
+    Config readback = radio.read_reg(Config{});
+    if (readback.crc_mode != CrcMode::Disabled) {
+        radio.write_reg(cfg);
+        readback = radio.read_reg(Config{});
+        if (readback.crc_mode != CrcMode::Disabled) {
+            printf("[BLE CONFIG] WARNING: EN_CRC forced on despite EN_AA=0 — "
+                   "CONFIG=0x%02X, possible clone chip\n", readback.to_byte());
+        }
+    }
 
     /* Enable pipe 0 only */
     EnRxAddr en_rx;

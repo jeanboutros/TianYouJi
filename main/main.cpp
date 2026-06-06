@@ -9,9 +9,16 @@
 #include <inttypes.h>
 #include "nrf24l01plus/registers/status.h"
 #include "nrf24l01plus/registers/config.h"
-#include "nrf24l01plus/registers/rf_ch.h"
+#include "nrf24l01plus/registers/en_aa.h"
 #include "nrf24l01plus/registers/en_rxaddr.h"
+#include "nrf24l01plus/registers/setup_aw.h"
+#include "nrf24l01plus/registers/setup_retr.h"
+#include "nrf24l01plus/registers/rf_ch.h"
+#include "nrf24l01plus/registers/rf_setup.h"
 #include "nrf24l01plus/registers/rx_pw.h"
+#include "nrf24l01plus/registers/fifo_status.h"
+#include "nrf24l01plus/registers/feature.h"
+#include "nrf24l01plus/registers/dynpd.h"
 #include "sdkconfig.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -52,8 +59,8 @@ static constexpr uint32_t HB_LOOP_INTERVAL = 500;
 /**
  * @brief Print a one-time diagnostic summary of nRF24L01+ register state.
  *
- * Reads back CONFIG, RF_CH, EN_RXADDR, RX_PW_P0, and RX_ADDR_P0 to
- * confirm the device was programmed correctly after configure_rx().
+ * Reads back ALL registers relevant to BLE passive RX after
+ * nrf24::ble::configure_rx() to verify the device was programmed correctly.
  * Must be called AFTER nrf24::ble::configure_rx() and BEFORE the
  * sniffer task starts.
  *
@@ -61,16 +68,56 @@ static constexpr uint32_t HB_LOOP_INTERVAL = 500;
  */
 static void print_register_diagnostics(nrf24::Driver &radio)
 {
-    printf("\n=== Register read-back ===\n");
+    printf("\n=== Comprehensive register read-back ===\n");
 
-    /* CONFIG — expect PWR_UP=1, PRIM_RX=1, CRC disabled (raw 0x03) */
+    /* CONFIG — expect PWR_UP=1, PRIM_RX=1, EN_CRC=0 (raw 0x03).
+     * CRITICAL: if EN_CRC=1 here, the nRF24 will reject every BLE packet
+     * because it expects a CRC that BLE packets don't include in the
+     * format nRF24 understands. */
     auto cfg = radio.read_reg(nrf24::Config{});
-    printf("  CONFIG      PWR_UP=%u  PRIM_RX=%u  EN_CRC=%u  CRCO=%u  (raw 0x%02X)\n",
-           static_cast<unsigned>(cfg.power_mode),
-           static_cast<unsigned>(cfg.primary),
+    printf("  CONFIG      EN_CRC=%u CRCO=%u PWR_UP=%u PRIM_RX=%u irq=0x%02X  (raw 0x%02X)  %s\n",
            static_cast<unsigned>(cfg.crc_mode),
            static_cast<unsigned>(cfg.crc_encoding),
-           cfg.to_byte());
+           static_cast<unsigned>(cfg.power_mode),
+           static_cast<unsigned>(cfg.primary),
+           static_cast<unsigned>(cfg.irq_mask),
+           cfg.to_byte(),
+           cfg.crc_mode == nrf24::CrcMode::Disabled ? "[OK: CRC off]"
+                                                      : "[FAIL: CRC ON - BLE pkts rejected!]");
+
+    /* EN_AA — expect 0x00 (all disabled).
+     * If any bit is 1, EN_CRC is forced on per datasheet §CONFIG. */
+    auto en_aa = radio.read_reg(nrf24::EnAa{});
+    printf("  EN_AA       P0=%d P1=%d P2=%d P3=%d P4=%d P5=%d  (raw 0x%02X)  %s\n",
+           en_aa.pipe[0], en_aa.pipe[1], en_aa.pipe[2],
+           en_aa.pipe[3], en_aa.pipe[4], en_aa.pipe[5],
+           en_aa.to_byte(),
+           en_aa.to_byte() == 0x00 ? "[OK: all off]"
+                                    : "[FAIL: EN_CRC will be forced on!]");
+
+    /* EN_RXADDR — expect pipe 0 only (0x01) */
+    auto en_rx = radio.read_reg(nrf24::EnRxAddr{});
+    printf("  EN_RXADDR   P0=%d P1=%d P2=%d P3=%d P4=%d P5=%d  (raw 0x%02X)\n",
+           en_rx.pipe[0], en_rx.pipe[1], en_rx.pipe[2],
+           en_rx.pipe[3], en_rx.pipe[4], en_rx.pipe[5],
+           en_rx.to_byte());
+
+    /* SETUP_AW — expect 4 bytes (0x02) */
+    auto aw = radio.read_reg(nrf24::SetupAw{});
+    printf("  SETUP_AW    width=%u  (raw 0x%02X)  %s\n",
+           static_cast<unsigned>(aw.address_width),
+           aw.to_byte(),
+           aw.address_width == nrf24::AddressWidth::Bytes4 ? "[OK]"
+                                                             : "[FAIL: expected 4 bytes]");
+
+    /* SETUP_RETR — expect ARC=0 (0x00) */
+    auto retr = radio.read_reg(nrf24::SetupRetr{});
+    printf("  SETUP_RETR  delay=%u count=%u  (raw 0x%02X)  %s\n",
+           static_cast<unsigned>(retr.delay),
+           static_cast<unsigned>(retr.count),
+           retr.to_byte(),
+           retr.count == nrf24::AutoRetransmitCount::Disabled ? "[OK: no retransmit]"
+                                                                : "[FAIL: retransmit enabled!]");
 
     /* RF_CH — should match the initial BLE channel frequency */
     auto rf_ch = radio.read_reg(nrf24::RfCh{});
@@ -78,12 +125,16 @@ static void print_register_diagnostics(nrf24::Driver &radio)
            rf_ch.channel, 2400 + rf_ch.channel,
            rf_ch.to_byte());
 
-    /* EN_RXADDR — expect only pipe 0 enabled */
-    auto en_rx = radio.read_reg(nrf24::EnRxAddr{});
-    printf("  EN_RXADDR  P0=%d P1=%d P2=%d P3=%d P4=%d P5=%d  (raw 0x%02X)\n",
-           en_rx.pipe[0], en_rx.pipe[1], en_rx.pipe[2],
-           en_rx.pipe[3], en_rx.pipe[4], en_rx.pipe[5],
-           en_rx.to_byte());
+    /* RF_SETUP — expect 1 Mbps, 0 dBm (0x06) */
+    auto rf_setup = radio.read_reg(nrf24::RfSetup{});
+    printf("  RF_SETUP    rate=%u pwr=%u cw=%u pll=%u  (raw 0x%02X)  %s\n",
+           static_cast<unsigned>(rf_setup.data_rate),
+           static_cast<unsigned>(rf_setup.tx_power),
+           static_cast<unsigned>(rf_setup.cont_wave),
+           static_cast<unsigned>(rf_setup.pll_lock),
+           rf_setup.to_byte(),
+           rf_setup.data_rate == nrf24::DataRate::Mbps1 ? "[OK: 1 Mbps]"
+                                                        : "[FAIL: not 1 Mbps!]");
 
     /* RX_PW_P0 — expect 32 bytes (0x20) */
     auto pw0 = radio.read_reg(nrf24::RxPwP0{});
@@ -91,10 +142,42 @@ static void print_register_diagnostics(nrf24::Driver &radio)
            pw0.payload_width,
            pw0.to_byte());
 
+    /* DYNPD — expect 0x00 (no dynamic payload) */
+    auto dynpd = radio.read_reg(nrf24::Dynpd{});
+    printf("  DYNPD       P0=%d P1=%d P2=%d P3=%d P4=%d P5=%d  (raw 0x%02X)\n",
+           dynpd.pipe[0], dynpd.pipe[1], dynpd.pipe[2],
+           dynpd.pipe[3], dynpd.pipe[4], dynpd.pipe[5],
+           dynpd.to_byte());
+
+    /* FEATURE — expect 0x00 (no dynamic features) */
+    auto feat = radio.read_reg(nrf24::Feature{});
+    printf("  FEATURE     en_dpl=%u en_ack_pay=%u en_dyn_ack=%u  (raw 0x%02X)\n",
+           static_cast<unsigned>(feat.en_dpl),
+           static_cast<unsigned>(feat.en_ack_pay),
+           static_cast<unsigned>(feat.en_dyn_ack),
+           feat.to_byte());
+
+    /* FIFO_STATUS — check initial state */
+    auto fifo = radio.read_reg(nrf24::FifoStatus{});
+    printf("  FIFO_STATUS tx_empty=%u tx_full=%u rx_empty=%u rx_full=%u tx_reuse=%u  (raw 0x%02X)\n",
+           static_cast<unsigned>(fifo.tx_empty),
+           static_cast<unsigned>(fifo.tx_full),
+           static_cast<unsigned>(fifo.rx_empty),
+           static_cast<unsigned>(fifo.rx_full),
+           static_cast<unsigned>(fifo.tx_reuse),
+           fifo.to_byte());
+
     /* RX_ADDR_P0 — expect {0x6B, 0x7D, 0x91, 0x71} (BLE adv access addr) */
     uint8_t addr[4];
     radio.read_reg_multi(nrf24::reg::RX_ADDR_P0, addr, 4);
-    printf("  RX_ADDR_P0  %02X:%02X:%02X:%02X  (exp 6B:7D:91:71)\n",
+    printf("  RX_ADDR_P0  %02X:%02X:%02X:%02X  (exp 6B:7D:91:71)  %s\n",
+           addr[0], addr[1], addr[2], addr[3],
+           (addr[0]==0x6B && addr[1]==0x7D && addr[2]==0x91 && addr[3]==0x71)
+               ? "[OK]" : "[FAIL: address mismatch!]");
+
+    /* TX_ADDR — expect same as RX_ADDR_P0 for promiscuous sniffing */
+    radio.read_reg_multi(nrf24::reg::TX_ADDR, addr, 4);
+    printf("  TX_ADDR     %02X:%02X:%02X:%02X\n",
            addr[0], addr[1], addr[2], addr[3]);
 
     printf("=== End register read-back ===\n\n");
@@ -157,8 +240,22 @@ static void ble_sniffer_task(void *arg)
         TickType_t deadline = xTaskGetTickCount() + pdMS_TO_TICKS(cfg.scan_duration_ms);
         while (xTaskGetTickCount() < deadline)
         {
-            if (nrf24::ble::rx_available(radio))
+            if (nrf24::ble::rx_fifo_not_empty(radio))
             {
+#if BLE_DIAG
+                /* Verify FIFO_STATUS before reading payload.
+                 * This diagnostic cross-checks that RX_EMPTY=0, confirming
+                 * the FIFO genuinely has data and we're not reading
+                 * garbage from an empty FIFO (which returns 0xFE). */
+                auto fifo = radio.read_reg(nrf24::FifoStatus{});
+                auto st = radio.read_reg(nrf24::Status{});
+                printf("[diag] FIFO_STATUS: rx_empty=%u rx_full=%u  STATUS: rx_dr=%u rx_p_no=%u\n",
+                       static_cast<unsigned>(fifo.rx_empty),
+                       static_cast<unsigned>(fifo.rx_full),
+                       static_cast<unsigned>(st.rx_dr),
+                       static_cast<unsigned>(st.rx_p_no));
+#endif
+
                 pkt_count++;
                 uint8_t buf[NRF24_MAX_PAYLOAD];
                 radio.read_payload(buf, NRF24_MAX_PAYLOAD);

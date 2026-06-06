@@ -248,5 +248,29 @@ inline bool rx_available(Driver &radio)
     return st.rx_dr;
 }
 
+/**
+ * @brief Check if the RX FIFO contains data using FIFO_STATUS register.
+ *
+ * Reads FIFO_STATUS and returns true if RX_EMPTY is 0 (FIFO not empty).
+ * This is more reliable than checking RX_DR alone, because RX_DR can be
+ * set spuriously or may not reflect the actual FIFO state after
+ * operations like flush_rx().
+ *
+ * @code
+ *   if (nrf24::ble::rx_fifo_not_empty(radio)) {
+ *       uint8_t buf[32];
+ *       radio.read_payload(buf, 32);
+ *   }
+ * @endcode
+ *
+ * @param radio  Driver instance.
+ * @return       true if RX FIFO is NOT empty (data available).
+ */
+inline bool rx_fifo_not_empty(Driver &radio)
+{
+    auto fs = radio.read_reg(FifoStatus{});
+    return !fs.rx_empty;
+}
+
 } // namespace ble
 } // namespace nrf24
