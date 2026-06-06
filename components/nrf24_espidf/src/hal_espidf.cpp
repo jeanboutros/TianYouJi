@@ -1,5 +1,7 @@
 #include "nrf24_espidf/hal_espidf.h"
 #include "esp_check.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 #include <cstring>
 
 namespace nrf24 {
@@ -82,6 +84,11 @@ void EspIdfHal::ce_high()
 void EspIdfHal::ce_low()
 {
     gpio_set_level(ce_pin_, 0);
+}
+
+void EspIdfHal::delay_ms(uint32_t ms)
+{
+    vTaskDelay(pdMS_TO_TICKS(ms));
 }
 
 } // namespace nrf24

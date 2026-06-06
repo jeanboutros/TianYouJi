@@ -57,6 +57,22 @@ public:
      * @brief Drive the CE pin low (return to standby-I).
      */
     virtual void ce_low() = 0;
+
+    /**
+     * @brief Busy-wait for the specified number of milliseconds.
+     *
+     * Used for nRF24L01+ timing constraints that require the host to
+     * wait before proceeding — e.g. Tpd2stby (1.5 ms after PWR_UP=1
+     * before CE is safe to assert, per datasheet §6.1.2 Table 9).
+     *
+     * Implementations should yield the CPU where possible (e.g.
+     * FreeRTOS vTaskDelay) rather than spinning.
+     *
+     * @param ms  Duration in milliseconds.  The actual granularity
+     *            depends on the platform tick rate (e.g. 1 ms per tick
+     *            on a 1000 Hz FreeRTOS config).
+     */
+    virtual void delay_ms(uint32_t ms) = 0;
 };
 
 } // namespace nrf24

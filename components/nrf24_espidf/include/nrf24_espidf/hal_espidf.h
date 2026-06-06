@@ -51,6 +51,7 @@ public:
     void spi_xfer(uint8_t cmd, const uint8_t *tx, uint8_t *rx, uint8_t len) override;
     void ce_high() override;
     void ce_low() override;
+    void delay_ms(uint32_t ms) override;
 
     /**
      * @brief Get the MOSI pin number (for platform-specific post-init control).
