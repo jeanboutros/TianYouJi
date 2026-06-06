@@ -421,7 +421,7 @@ export IDF_PYTHON_ENV_PATH=$HOME/.espressif/tools/python/v6.0.1/venv
 
 4. **MOSI pin direction**: Never set SPI pins to `GPIO_MODE_INPUT` after `spi_bus_initialize()`. This silently breaks all SPI writes while reads appear to work. See skill §1.4.
 
-5. **GPIO5 overlap**: GPIO5 is SPI3_HOST's native IO_MUX CS0. Consider migrating CE to GPIO4. See skill §1.3.
+5. **GPIO5 overlap (RESOLVED)**: CE was migrated from GPIO5 to GPIO4 to avoid SPI3_HOST IO_MUX CS0 overlap. Do NOT move CE back to GPIO5. See skill §1.3.
 
 6. **Clone chips**: Si24R1/BK2425 clones may not follow CRC forcing rules. Use `spi_comm_test()` Stage 3 to detect. See skill §1.5.
 

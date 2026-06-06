@@ -155,10 +155,9 @@ gpio_config_t gpio_cfg = {
 };
 ```
 
-**Additional note:** GPIO5 is SPI3_HOST's native IO_MUX CS0 pin. If using SPI3_HOST
-and CE=GPIO5, the SPI driver internally enables IO_MUX CS0. While `PIN_FUNC_GPIO`
-disconnects the IO_MUX signal from the pad, consider moving CE to a non-IOMUX pin
-(e.g., GPIO4) for maximum safety.
+**Additional note:** CE has been migrated from GPIO5 to GPIO4. GPIO5 is SPI3_HOST's
+native IO_MUX CS0 pin, and using it for CE created a latent conflict. Do NOT move CE
+back to GPIO5.
 
 **Reference:** ESP-IDF GPIO & RTC GPIO documentation,
 learning doc: `docs/learning/mosi-spi-register-verification.md`
