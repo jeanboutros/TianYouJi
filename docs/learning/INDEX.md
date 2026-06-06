@@ -14,6 +14,7 @@
 - [Point-to-point communication: pipes, addressing, auto-ACK](nrf24-point-to-point.md)
 - [Passive spectrum scan: RPD register, channel energy map](nrf24-spectrum-scan.md)
 - [BLE packet crafting: raw ADV_NONCONN_IND from NRF24](nrf24-ble-packet-crafting.md)
+- [Register map: complete nRF24L01+ register reference](nrf24l01plus-register-map.md)
 
 ## BLE Protocol
 - [Data whitening on nRF24L01+: bugs found, correct Galois LFSR, seed derivation](ble-data-whitening-nrf24.md)
@@ -27,3 +28,6 @@
 
 ## C/C++ Basics
 - [enum class and struct: design patterns for embedded library types](cpp-enum-class-and-struct.md)
+
+## Debugging
+- [MOSI SPI pin direction bug, register verification, and multi-agent review findings](mosi-spi-register-verification.md)
