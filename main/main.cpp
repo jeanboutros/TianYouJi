@@ -49,6 +49,13 @@ static nrf24::Driver radio(hal);
 /* Print heartbeat every 500 loop iterations (reduces serial noise) */
 static constexpr uint32_t HB_LOOP_INTERVAL = 500;
 
+/** @brief Enable BLE diagnostic output (RPD monitoring, raw FIFO dump).
+ *
+ * Set to 1 to enable, 0 to disable. When disabled, no additional
+ * serial output is produced and runtime behaviour is unchanged.
+ */
+#define BLE_DIAG 1
+
 /* --- Startup diagnostic: read back key registers ------------------------ */
 
 /**
@@ -132,8 +139,27 @@ static void ble_sniffer_task(void *arg)
             printf("[hb] loops=%" PRIu32 "  pkts=%" PRIu32
                    "  STATUS={%s}  ble_ch=%u\n",
                    loop_count, pkt_count, st_buf, ble_ch);
+#if BLE_DIAG
+            auto rpd = radio.read_reg(nrf24::Rpd{});
+            printf("[diag] RPD: ch%u signal=%u (%s)\n",
+                   ble_ch,
+                   static_cast<unsigned>(rpd.received_power),
+                   rpd.received_power ? "> -64 dBm" : "< -64 dBm");
+#endif
         }
         loop_count++;
+
+#if BLE_DIAG
+        /* Read RPD *before* switch_channel() — switch_channel() does ce_low/ce_high
+         * which re-enters RX mode and resets the RPD latch (datasheet §9). */
+        {
+            auto rpd = radio.read_reg(nrf24::Rpd{});
+            printf("[diag] RPD before switch: ch%u signal=%u (%s)\n",
+                   ble_ch,
+                   static_cast<unsigned>(rpd.received_power),
+                   rpd.received_power ? "> -64 dBm" : "< -64 dBm");
+        }
+#endif
 
         nrf24::ble::switch_channel(radio, ble_ch);
 
@@ -147,6 +173,18 @@ static void ble_sniffer_task(void *arg)
                 radio.read_payload(buf, NRF24_MAX_PAYLOAD);
                 nrf24::ble::clear_irq_flags(radio);
                 radio.flush_rx();
+
+#if BLE_DIAG
+                /* Print raw whitened bytes before dewhitening for pattern analysis.
+                 * This shows the data exactly as received from the nRF24L01+ RX FIFO,
+                 * still in MSbit-first byte order with BLE whitening applied. */
+                printf("[diag] raw:");
+                for (uint8_t i = 0; i < NRF24_MAX_PAYLOAD; i++)
+                {
+                    printf(" %02X", buf[i]);
+                }
+                printf("\n");
+#endif
 
                 nrf24::ble::dewhiten(buf, NRF24_MAX_PAYLOAD, ble_ch);
 
