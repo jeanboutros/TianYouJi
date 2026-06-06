@@ -6,7 +6,7 @@
 
 This document captures findings from multi-agent review and debugging sessions on the ESP32 nRF24L01+ BLE sniffer project. The most critical finding is a bug where setting the MOSI GPIO pin to `GPIO_MODE_INPUT` after SPI initialization silently broke all SPI write operations. Additional findings cover BLE dewhitening bugs, access address byte order verification, register write-and-verify debugging, zero-packets diagnosis, memory safety fixes, and a summary of the challenger review process.
 
-These findings demonstrate the value of structured multi-agent review: the dual-model challenge caught both true positives (the MOSI bug) and correctly resolved false positives (the access address concern).
+These findings demonstrate the value of structured multi-agent review: the dual-model challenge caught both true positives (the MOSI bug and the access address byte order bug). The access address finding C-1 was originally dismissed as a false positive but was later confirmed correct — see [nrf24-spi-address-byte-order.md](nrf24-spi-address-byte-order.md).
 
 ---
 
@@ -136,11 +136,17 @@ For the full analysis including step-by-step LFSR traces and reference implement
 
 ### 4.1 Finding
 
+> **⚠️ CORRECTION (2026-06-06):** The byte order stated below is **WRONG**. The correct LSByte-first SPI write order is `{0x71, 0x91, 0x7D, 0x6B}`, not `{0x6B, 0x7D, 0x91, 0x71}`. See [nrf24-spi-address-byte-order.md](nrf24-spi-address-byte-order.md) for the corrected full analysis.
+
 The BLE advertising access address `{0x6B, 0x7D, 0x91, 0x71}` is correct. It is stored LSByte-first (matching nRF24L01+ SPI convention) with each byte bit-reversed per the BLE spec for on-air transmission.
 
 **Do NOT change to {0x8E, 0x89, ...}** — that would represent the access address in native BLE format without the nRF24-required transformations.
 
 ### 4.2 Verification
+
+> **⚠️ CORRECTION (2026-06-06):** The original §4.2 conclusion was **WRONG**. The byte order `{0x6B, 0x7D, 0x91, 0x71}` was in MSByte-first on-air order, not LSByte-first SPI write order. The challenger HW-engineer's finding C-1 was **correct** — the bytes should have been `{0x71, 0x91, 0x7D, 0x6B}`. This was fixed and documented in [nrf24-spi-address-byte-order.md](nrf24-spi-address-byte-order.md).
+
+**Original (incorrect) text preserved below for audit trail:**
 
 The challenger HW-engineer flagged this as a concern during the dual-model challenge, but detailed analysis confirmed the byte order is correct. The reasoning:
 
@@ -154,6 +160,8 @@ The access address `0x8E89BED6` in BLE native format is stored as `{0x6B, 0x7D, 
 - Per-byte bit reversal (e.g., `0x8E` → `0x71`, `0x89` → `0x91`, `0xBE` → `0x7D`, `0xD6` → `0x6B`)
 
 Resulting in `{0x6B, 0x7D, 0x91, 0x71}` — which matches the code.
+
+**Why the original analysis was wrong:** The transformation chain stopped at step 3 (nRF24 on-air byte order) and did not apply step 4 (SPI LSByte-first write order per datasheet §8.3.1). The on-air order `{0x6B, 0x7D, 0x91, 0x71}` must be reversed to `{0x71, 0x91, 0x7D, 0x6B}` for the SPI write. Dmitry Grinberg's reference implementation confirms this: `buf[1] = swapbits(0x8E) = 0x71` is the first SPI data byte.
 
 ### 4.3 Lesson
 
@@ -204,7 +212,7 @@ When all register read-backs PASS (CONFIG=0x03, RF_CH=0x02, EN_RXADDR=0x01, etc.
 | 1 | CONFIG = 0x03 (PWR_UP=1, PRIM_RX=1, CRC disabled) | Radio must be powered up in RX mode for BLE sniffing | `Config{.power_mode=PowerMode::Up, .primary=PrimaryMode::RX, .crc_mode=CrcMode::Disabled}.to_byte() → 0x03` |
 | 2 | RF_CH matches expected BLE frequency | Channel must map correctly: ch37→RF_CH=2, ch38→RF_CH=26, ch39→RF_CH=80 | `RfCh{.channel=2}.to_byte() → 0x02` |
 | 3 | EN_RXADDR has pipe 0 enabled | RX pipe 0 must be enabled to receive | `EnRxAddr{.pipe={true,false,false,false,false,false}}.to_byte() → 0x01` |
-| 4 | RX_ADDR_P0 = BLE access address | Must be `{0x6B, 0x7D, 0x91, 0x71}` (bit-reversed, LSByte-first) | — |
+| 4 | RX_ADDR_P0 = BLE access address | Must be `{0x71, 0x91, 0x7D, 0x6B}` (LSByte-first SPI write order) | — |
 | 5 | RX_PW_P0 = 32 | Maximum payload width to capture full BLE packets | `RxPw{.payload_width=32}.to_byte() → 0x20` |
 | 6 | CE is HIGH during RX mode | nRF24L01+ requires CE HIGH to remain in RX mode | — |
 | 7 | **MOSI pin is NOT set to GPIO_MODE_INPUT** | This was the root cause — disconnects MOSI from SPI | — |
@@ -272,7 +280,7 @@ Three challenger reviews were completed (software-engineer, hardware-engineer, w
 
 | ID | Challenger | Finding | Resolution |
 |----|-----------|---------|------------|
-| C-1 | HW-engineer | Access address byte order is wrong | **INCORRECT** — Verified correct after detailed analysis. The byte order `{0x6B, 0x7D, 0x91, 0x71}` accounts for both LSByte-first SPI ordering and per-byte bit reversal for BLE. |
+| C-1 | HW-engineer | Access address byte order is wrong | **CORRECT (originally marked INCORRECT — see correction below)** — The byte order `{0x6B, 0x7D, 0x91, 0x71}` was MSByte-first on-air order, not LSByte-first SPI write order. Fixed to `{0x71, 0x91, 0x7D, 0x6B}` on 2026-06-06. See [nrf24-spi-address-byte-order.md](nrf24-spi-address-byte-order.md). |
 | C-2 | HW-engineer | MOSI set to GPIO_MODE_INPUT breaks SPI writes | **FIXED** — Removed the offending `gpio_set_direction()` calls. The SPI driver manages pin direction. |
 | C-3 | Wireless-expert | Dewhitening algorithm correctness | **APPROVED** — Correct Galois LFSR implementation with proper seed and bit-swap confirmed. |
 
@@ -280,13 +288,13 @@ Three challenger reviews were completed (software-engineer, hardware-engineer, w
 
 The dual-model challenge caught:
 - **True positive (C-2):** The MOSI bug was a real, critical failure that would have caused silent data loss.
-- **False positive (C-1):** The access address concern was well-motivated but turned out to be incorrect after tracing the byte/bit transformation chain.
+- **True positive (C-1):** The access address byte order was **WRONG** — originally dismissed as a false positive, but the challenger was actually correct. The transformation chain analysis in §4.2 stopped one step short (did not apply the SPI LSByte-first reversal per datasheet §8.3.1). Fixed on 2026-06-06. See [nrf24-spi-address-byte-order.md](nrf24-spi-address-byte-order.md) for the full analysis.
 
-Both outcomes demonstrate the value of adversarial review: true positives prevent shipping bugs, and properly resolved false positives deepen understanding of the protocol.
+Both outcomes demonstrate the value of adversarial review: true positives prevent shipping bugs, and even dismissed findings deserve thorough re-examination.
 
 ### 8.2 Lesson
 
-> **A challenger finding marked INCORRECT is not wasted effort.** Investigating C-1 led to a complete trace of the access address transformation chain, which produced a verified explanation that now serves as a permanent reference. The challenger's job is to find potential issues, not to be infallible.
+> **A challenger finding should not be dismissed without addressing the cited evidence.** The original investigation of C-1 stopped one transformation step short (did not apply the SPI LSByte-first reversal from datasheet §8.3.1). The challenger had cited the correct datasheet section and Dmitry Grinberg's reference. If the primary reviewer cannot explain *why* the cited evidence does not apply, the finding stands. See [nrf24-spi-address-byte-order.md](nrf24-spi-address-byte-order.md) for the corrected full analysis.
 
 ---
 
@@ -310,15 +318,17 @@ SPI write failures where the slave never receives the data but the master gets a
 ### 9.3 Bit Order and Byte Order Must Be Traced End-to-End
 
 When bridging two protocols with different conventions (nRF24 MSB-first vs BLE LSB-first), you must trace the complete transformation chain:
-1. BLE on-air format (LSBit-first per byte, native byte order)
-2. nRF24 SPI format (MSB-first per byte, LSByte-first word order)
-3. The relationship: each byte is bit-reversed, byte order is preserved
+1. BLE on-air format (LSBit-first per byte, LSByte-first word order)
+2. nRF24 on-air format (MSBit-first per byte, MSByte-first address order)
+3. nRF24 SPI format (MSBit-first per byte, **LSByte-first** word order — per datasheet §8.3.1)
+
+The relationship is: each byte is bit-reversed (swapbits), AND the byte order is reversed between nRF24 on-air (MSByte first) and nRF24 SPI (LSByte first). Stopping the chain at step 2 without completing step 3 was the root cause of the ADV_ACCESS_ADDR bug. See [nrf24-spi-address-byte-order.md](nrf24-spi-address-byte-order.md) for the full corrected transformation chain.
 
 An isolated check of either convention can produce a false sense of correctness.
 
 ### 9.4 Dual-Model Review Catches Bugs That Single-Pass Review Misses
 
-The MOSI bug (C-2) was caught by the challenger HW-engineer, not by the primary review. The access address concern (C-1) was a false positive, but investigating it strengthened the verification of the code's correctness.
+The MOSI bug (C-2) was caught by the challenger HW-engineer, not by the primary review. The access address byte order bug (C-1) was also caught by the challenger HW-engineer — it was originally dismissed as a false positive but was later confirmed correct (see [nrf24-spi-address-byte-order.md](nrf24-spi-address-byte-order.md)).
 
 **Rule:** Always run a challenger pass for non-trivial hardware or protocol code. The cost of an extra review cycle is far less than the cost of shipping a silent SPI failure.
 

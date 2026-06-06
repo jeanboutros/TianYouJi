@@ -15,6 +15,7 @@
 - [Passive spectrum scan: RPD register, channel energy map](nrf24-spectrum-scan.md)
 - [BLE packet crafting: raw ADV_NONCONN_IND from NRF24](nrf24-ble-packet-crafting.md)
 - [Register map: complete nRF24L01+ register reference](nrf24l01plus-register-map.md)
+- [SPI address byte order: LSByte-first write convention, ADV_ACCESS_ADDR bug](nrf24-spi-address-byte-order.md)
 
 ## BLE Protocol
 - [Data whitening on nRF24L01+: bugs found, correct Galois LFSR, seed derivation](ble-data-whitening-nrf24.md)
