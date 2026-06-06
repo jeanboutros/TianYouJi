@@ -162,6 +162,72 @@ public:
      */
     bool write_and_verify_multi(uint8_t reg, const uint8_t *data, uint8_t len);
 
+    // --- Typed register overloads ---
+
+    /**
+     * @brief Read a single-byte register and return the typed struct.
+     *
+     * Deduces the register address from StructType::ADDRESS, reads the byte,
+     * and reconstructs the typed struct using StructType::from_byte().
+     *
+     * @code
+     *   auto cfg = radio.read_reg(nrf24::Config{});
+     *   auto st  = radio.read_reg(nrf24::Status{});
+     * @endcode
+     *
+     * @tparam StructType  Register struct type (must have ADDRESS and from_byte()).
+     * @param tag           Default-constructed struct for type deduction.
+     * @return             Populated struct with from_byte() applied to the read value.
+     */
+    template <typename StructType>
+    StructType read_reg(StructType tag = {});
+
+    /**
+     * @brief Write a single-byte register using a typed struct.
+     *
+     * Deduces the register address from StructType::ADDRESS and serialises
+     * the struct using to_byte().  Callers never need to remember raw addresses.
+     *
+     * @code
+     *   nrf24::Config cfg;
+     *   cfg.power_mode = nrf24::PowerMode::Up;
+     *   cfg.primary    = nrf24::PrimaryMode::RX;
+     *   radio.write_reg(cfg);
+     * @endcode
+     *
+     * @tparam StructType  Register struct type (must have ADDRESS and to_byte()).
+     * @param reg_struct   Struct instance to write.
+     */
+    template <typename StructType>
+    void write_reg(const StructType &reg_struct);
+
+    /**
+     * @brief Write a register, read it back, and verify the value matches.
+     *
+     * Deduces the register address from StructType::ADDRESS. Writes
+     * reg_struct.to_byte(), reads back, and compares using StructType::from_byte().
+     *
+     * Normalises reserved bits: the read-back value is parsed with from_byte()
+     * and re-serialised with to_byte() before comparison, so reserved-bit
+     * differences do not cause false mismatches.
+     *
+     * @code
+     *   nrf24::Config cfg;
+     *   cfg.power_mode = nrf24::PowerMode::Up;
+     *   cfg.primary    = nrf24::PrimaryMode::RX;
+     *   cfg.crc_mode   = nrf24::CrcMode::Disabled;
+     *   bool ok = radio.write_and_verify(cfg);
+     *   // ok == true  → device accepted the write
+     *   // ok == false → read-back mismatches
+     * @endcode
+     *
+     * @tparam StructType  Register struct type (must have ADDRESS, to_byte(), from_byte()).
+     * @param reg_struct   Struct instance to write.
+     * @return            true if read-back matches, false otherwise.
+     */
+    template <typename StructType>
+    bool write_and_verify(const StructType &reg_struct);
+
     /**
      * @brief Access the underlying HAL.
      *
@@ -172,5 +238,27 @@ public:
 private:
     Hal &hal_;
 };
+
+// --- Template method definitions (must be in header for implicit instantiation) ---
+
+template <typename StructType>
+StructType Driver::read_reg(StructType)
+{
+    return StructType::from_byte(read_reg(StructType::ADDRESS));
+}
+
+template <typename StructType>
+void Driver::write_reg(const StructType &reg_struct)
+{
+    write_reg(StructType::ADDRESS, reg_struct.to_byte());
+}
+
+template <typename StructType>
+bool Driver::write_and_verify(const StructType &reg_struct)
+{
+    write_reg(StructType::ADDRESS, reg_struct.to_byte());
+    auto readback = StructType::from_byte(read_reg(StructType::ADDRESS));
+    return readback.to_byte() == reg_struct.to_byte();
+}
 
 } // namespace nrf24

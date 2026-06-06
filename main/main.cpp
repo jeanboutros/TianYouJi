@@ -59,32 +59,29 @@ static void print_register_diagnostics(nrf24::Driver &radio)
     printf("\n=== Register read-back ===\n");
 
     /* CONFIG — expect PWR_UP=1, PRIM_RX=1, CRC disabled (raw 0x03) */
-    uint8_t raw_cfg = radio.read_reg(nrf24::reg::CONFIG);
-    auto cfg = nrf24::Config::from_byte(raw_cfg);
+    auto cfg = radio.read_reg(nrf24::Config{});
     printf("  CONFIG      PWR_UP=%u  PRIM_RX=%u  EN_CRC=%u  CRCO=%u  (raw 0x%02X)\n",
            static_cast<unsigned>(cfg.power_mode),
            static_cast<unsigned>(cfg.primary),
            static_cast<unsigned>(cfg.crc_mode),
            static_cast<unsigned>(cfg.crc_encoding),
-           raw_cfg);
+           cfg.to_byte());
 
     /* RF_CH — should match the initial BLE channel frequency */
-    uint8_t raw_rf_ch = radio.read_reg(nrf24::reg::RF_CH);
-    auto rf_ch = nrf24::RfCh::from_byte(raw_rf_ch);
+    auto rf_ch = radio.read_reg(nrf24::RfCh{});
     printf("  RF_CH       channel=%u  freq=%u MHz  (raw 0x%02X)\n",
            rf_ch.channel, 2400 + rf_ch.channel,
-           raw_rf_ch);
+           rf_ch.to_byte());
 
     /* EN_RXADDR — expect only pipe 0 enabled */
-    uint8_t raw_en_rx = radio.read_reg(nrf24::reg::EN_RXADDR);
-    auto en_rx = nrf24::EnRxAddr::from_byte(raw_en_rx);
+    auto en_rx = radio.read_reg(nrf24::EnRxAddr{});
     printf("  EN_RXADDR  P0=%d P1=%d P2=%d P3=%d P4=%d P5=%d  (raw 0x%02X)\n",
            en_rx.pipe[0], en_rx.pipe[1], en_rx.pipe[2],
            en_rx.pipe[3], en_rx.pipe[4], en_rx.pipe[5],
-           raw_en_rx);
+           en_rx.to_byte());
 
     /* RX_PW_P0 — expect 32 bytes (0x20) */
-    uint8_t raw_pw = radio.read_reg(nrf24::reg::RX_PW_P0);
+    uint8_t raw_pw = radio.read_reg(nrf24::RxPwP0::ADDRESS);
     auto pw = nrf24::RxPw::from_byte(raw_pw);
     printf("  RX_PW_P0    payload_width=%u  (raw 0x%02X)\n",
            pw.payload_width,
@@ -123,7 +120,7 @@ static void ble_sniffer_task(void *arg)
 
         if ((loop_count % HB_LOOP_INTERVAL) == 0)
         {
-            auto st = nrf24::Status::from_byte(radio.read_reg(nrf24::reg::STATUS));
+            auto st = radio.read_reg(nrf24::Status{});
             char st_buf[96];
             st.format(st_buf, sizeof(st_buf));
             printf("[hb] loops=%" PRIu32 "  pkts=%" PRIu32
