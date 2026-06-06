@@ -22,6 +22,7 @@
 
 ## Hardware Tools
 - [Ubertooth One BLE testing: TX, sniffing, firmware validation](ubertooth-ble-testing.md)
+- [Ubertooth update process, TX failure diagnosis, and nRF Sniffer cross-validation](ubertooth-update-and-diagnostics.md)
 
 ## BLE (ESP32 Bluetooth Stack)
 - [BLE advertising with ESP-IDF: GAP API, non-connectable beacons](ble-advertising-esp32.md)
