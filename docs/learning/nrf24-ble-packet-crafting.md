@@ -128,27 +128,43 @@ BLE applies a **data whitening** LFSR to the entire packet (PDU + CRC) to reduce
 ### Whitening LFSR
 
 - Polynomial: `x^7 + x^4 + 1`
-- Seed: `(1 << 6) | channel_number` (position 1 in MSB, channel in bits 5:0)
+- Algorithm: **Galois LFSR** (left-shifting, checks bit 7, XOR `0x11`)
+- Seed: `swapbits(channel_number) | 2`
+
+The seed derivation and Galois LFSR algorithm are from Dmitry Grinberg's
+original "Bit-banging Bluetooth Low Energy" reference implementation,
+which is the origin of all known nRF24 BLE code (omriiluz, sandeepmistry,
+MarcelMG, etc. all derive from it).
+
+`swapbits(channel)` bit-reverses the channel number so it occupies the
+lower 6 bits of the left-shifting LFSR state.  Bit 1 is set (`| 2`) to
+place position 1 in the 7-bit Galois register.
 
 ```c
+// Galois LFSR whitening/dewhitening — symmetric (same function both ways)
+// Reference: Dmitry Grinberg, "Bit-banging Bluetooth Low Energy"
+//   http://dmitry.gr/index.php?r=05.Projects&proj=11.%20Bluetooth%20LE%20fakery
 void ble_whiten(uint8_t *data, size_t len, uint8_t channel) {
-    uint8_t lfsr = (1 << 6) | (channel & 0x3F);  // BLE channel index
+    uint8_t lfsr = swapbits(channel) | 2;  // Galois LFSR seed
 
     for (size_t i = 0; i < len; i++) {
-        uint8_t whitened_byte = 0;
-        for (int bit = 0; bit < 8; bit++) {
-            // XOR data bit with LFSR output (bit 0)
-            if (lfsr & 1) {
-                whitened_byte |= (1 << bit);
+        for (uint8_t m = 1; m; m <<= 1) {
+            if (lfsr & 0x80) {
+                lfsr ^= 0x11;   // polynomial taps: x^4 (bit 4) and 1 (bit 0)
+                data[i] ^= m;
             }
-            // Advance LFSR: feedback from bit 0 XOR bit 4
-            uint8_t feedback = ((lfsr >> 0) ^ (lfsr >> 4)) & 1;
-            lfsr = (lfsr >> 1) | (feedback << 6);
+            lfsr <<= 1;
         }
-        data[i] ^= whitened_byte;
     }
 }
 ```
+
+> **Important:** For nRF24L01+ RX, the full dewhitening pipeline is:
+> 1. Bit-swap each received byte (nRF24 MSbit-first → BLE LSbit-first)
+> 2. Apply the Galois LFSR dewhitening above
+>
+> Forgetting the bit-swap is the most common bug in nRF24 BLE code.
+> See our library function `nrf24::ble::dewhiten()` which encapsulates both steps.
 
 ---
 
@@ -291,14 +307,23 @@ void broadcast_ble_name(const char *name) {
 
 ## 7. Byte Order Gotchas
 
-BLE and NRF24 both use **LSB first** for multi-byte fields, but the specifics differ:
+BLE and NRF24 both use **LSByte first** for multi-byte fields, but the **bit order within each byte differs**:
 
 | Field | BLE spec order | NRF24 TX order | Notes |
 |---|---|---|---|
 | Access Address | 0x8E89BED6 | `{0xD6, 0xBE, 0x89, 0x8E}` | LSByte first on air |
 | AdvA (MAC) | `AA:BB:CC:DD:EE:FF` | `{0xFF, 0xEE, 0xDD, 0xCC, 0xBB, 0xAA}` | LSByte first |
 | CRC24 | Result of polynomial | `{crc[7:0], crc[15:8], crc[23:16]}` | LSByte first |
-| Bits within byte | LSB first | LSB first | Both match! |
+| Bits within byte | **LSBit first** | **MSBit first** | **Mismatch! Requires bit-swap** |
+
+The nRF24L01+ SPI interface delivers data MSbit-first within each byte
+(nRF24L01+ Product Specification §7).  BLE transmits LSbit-first within
+each byte (Bluetooth Core Spec Vol 6 Part B §1.3.1).  This means every
+byte read from the nRF24 RX FIFO **must be bit-reversed** before BLE
+protocol processing (dewhitening, CRC, PDU decoding).  Conversely, every
+byte destined for nRF24 TX **must be bit-reversed** after BLE processing.
+
+Use `nrf24::ble::swapbits()` or let `dewhiten()` handle it automatically.
 
 ---
 
