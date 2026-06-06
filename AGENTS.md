@@ -404,120 +404,28 @@ export IDF_TOOLS_PATH=$HOME/.espressif
 export IDF_PYTHON_ENV_PATH=$HOME/.espressif/tools/python/v6.0.1/venv
 ```
 
-## nRF24L01+ Register Write Order — CRITICAL
+## nRF24L01+ Chip-Specific Traps
 
-### The EN_AA / EN_CRC Override Trap
+> **Full details, symptom tables, and code examples are in the `nrf24l01plus` skill.**
+> Load the skill before touching any nRF24L01+ code: `.opencode/skills/nrf24l01plus/SKILL.md`
 
-When configuring the nRF24L01+ for BLE passive reception, **EN_AA MUST be written to 0x00 BEFORE CONFIG is written with EN_CRC=0**.
+### Critical rules (summary)
 
-The nRF24L01+ datasheet states: *"If the EN_AA is set for any pipe, the EN_CRC bit in the CONFIG register is forced high."*
+1. **Register write order**: Write `EN_AA=0x00` **before** `CONFIG` (EN_CRC=0). If EN_AA is non-zero when CONFIG is written, the hardware forces EN_CRC=1 internally, silently rejecting every BLE packet. See skill §1.1 and `docs/learning/nrf24-enaa-encrc-override.md`.
 
-The power-on reset value of EN_AA is **0x3F** (all pipes auto-ACK enabled). If CONFIG is written with EN_CRC=0 while EN_AA is still 0x3F:
-1. The hardware overrides EN_CRC to 1 internally
-2. After clearing EN_AA=0x00, the stored CONFIG value **still has EN_CRC=1**
-3. The nRF24 now expects CRC in every received packet
-4. BLE packets use CRC-24 (3 bytes), not nRF24's CRC-1/CRC-2 (1–2 bytes)
-5. **Every BLE packet fails CRC check and is silently discarded**
-6. The RX FIFO stays empty; `read_payload()` returns 0xFE (power-on default)
+2. **SPI address byte order**: Multi-byte address registers (RX_ADDR_Pn, TX_ADDR) use **LSByte-first** SPI order (datasheet §8.3.1), which is the **opposite** of on-air byte order. Diagnostic readback of a wrong byte sequence passes — self-consistent errors are invisible. See skill §1.2 and `docs/learning/nrf24-spi-address-byte-order.md`.
 
-### Symptom Pattern
+3. **CE GPIO mode**: Use `GPIO_MODE_INPUT_OUTPUT` (not `GPIO_MODE_OUTPUT`). Output-only pins disable the input buffer; `gpio_get_level()` always returns 0. See skill §1.3.
 
-| Symptom | Cause |
-|---------|-------|
-| RX FIFO always 0xFE | CRC rejection → no valid packets reach FIFO |
-| RX_DR set but no real data | FIFO read from empty buffer returns 0xFE |
-| RPD signal very rare (0.1%) | nRF24 can detect RF energy but can't demodulate with wrong CRC |
-| Channel-dependent "MACs" after dewhitening | 0xFE × 32 dewhittened produces fake but deterministic PDUs |
+4. **MOSI pin direction**: Never set SPI pins to `GPIO_MODE_INPUT` after `spi_bus_initialize()`. This silently breaks all SPI writes while reads appear to work. See skill §1.4.
 
-### Prevention
+5. **GPIO5 overlap**: GPIO5 is SPI3_HOST's native IO_MUX CS0. Consider migrating CE to GPIO4. See skill §1.3.
 
-```cpp
-// BROKEN — CONFIG written before EN_AA
-radio.write_reg(cfg);       // EN_CRC=0 → OVERRIDDEN to 1 because EN_AA=0x3F
-radio.write_reg(en_aa);     // EN_AA=0x00 → too late, CONFIG already stored with EN_CRC=1
+6. **Clone chips**: Si24R1/BK2425 clones may not follow CRC forcing rules. Use `spi_comm_test()` Stage 3 to detect. See skill §1.5.
 
-// CORRECT — EN_AA zeroed first
-radio.write_reg(en_aa);     // EN_AA=0x00 → no forcing condition exists
-radio.write_reg(cfg);       // EN_CRC=0 → accepted as-is
-```
+### Self-reflection clause
 
-### Clone Chip Detection
-
-On genuine nRF24L01+, writing EN_AA=0x00 then CONFIG with EN_CRC=0 works correctly.
-On Si24R1 clone chips, the CRC forcing may persist even after EN_AA=0x00.
-Always read back CONFIG after writing and verify EN_CRC matches the intended value.
-
-## nRF24L01+ SPI Address Register Byte Order — CRITICAL
-
-### The LSByte-First Trap
-
-The nRF24L01+ datasheet §8.3.1 states: **"LSByte is written first"** for multi-byte address registers (RX_ADDR_P0, RX_ADDR_P1, TX_ADDR). This means the **first SPI data byte** maps to the **LSByte** of the address register, and the **last byte** maps to the **MSByte**.
-
-On-air, the nRF24 transmits the **MSByte first** (datasheet §7.3: "MSB to the left"). This is the OPPOSITE of the SPI write order, creating a common trap:
-
-```cpp
-// BROKEN — bytes in MSByte-first SPI order (looks "natural" but is wrong)
-//   On-air: MSByte=0x71 first, LSByte=0x6B last → matches AA 0x71919D6B ≠ 0x8E89BED6
-inline constexpr uint8_t ADV_ACCESS_ADDR[4] = {0x6B, 0x7D, 0x91, 0x71};
-
-// CORRECT — bytes in LSByte-first SPI order (per datasheet §8.3.1)
-//   On-air: MSByte=0x6B first, LSByte=0x71 last → matches AA 0x8E89BED6
-inline constexpr uint8_t ADV_ACCESS_ADDR[4] = {0x71, 0x91, 0x7D, 0x6B};
-```
-
-### Why This Is Easy to Get Wrong
-
-1. **Two independent bit/byte inversions**: BLE transmits LSBit-first per byte, nRF24 expects MSBit-first → requires `swapbits()`. BLE transmits LSByte-first on air, nRF24 SPI reads LSByte-first. These two inversions compose, and getting them wrong is nearly impossible to diagnose from the output alone.
-
-2. **Diagnostic readback passes**: If you write the wrong byte sequence and then read back the same register, you get the same wrong sequence — the comparison always passes. A self-consistent error is invisible to readback verification.
-
-3. **RPD detects RF ≠ packets received**: The nRF24 still detects RF energy (RPD=1) because that's a physical-layer measurement. But address matching fails silently, so the FIFO stays empty.
-
-### Transformation Chain (BLE AA → nRF24 SPI)
-
-```
-BLE Access Address: 0x8E89BED6
-
-Step 1: BLE on-air (LSByte-first): D6 BE 89 8E
-Step 2: Per-byte bit reversal (swapbits): 6B 7D 91 71  (MSByte-first on air)
-Step 3: nRF24 SPI write (LSByte-first): 71 91 7D 6B  (FIRST byte = LSByte)
-```
-
-Cross-verified against Dmitry Grinberg's reference implementation (`dmitry.gr`).
-
-### Symptom Pattern
-
-| Symptom | Cause |
-|---------|-------|
-| RPD=1 occasionally | RF energy detected (physical layer works) |
-| FIFO always empty | Address never matches → no packets enter FIFO |
-| 0xFE FIFO reads | Power-on default, not real data |
-| Channel-dependent "MACs" | 0x7F × 32 dewhittened produces deterministic but fake PDUs |
-
-### Prevention
-
-- Always verify multi-byte register SPI byte order against the datasheet AND an independent reference implementation
-- Never trust readback verification alone for self-consistent errors (write wrong → read same wrong → compare passes)
-- The challenger review that flagged this was **CORRECT** — it was dismissed based on an incomplete analysis of byte ordering conventions
-
-## nRF24L01+ CE GPIO Configuration — CRITICAL
-
-### The GPIO_MODE_OUTPUT Readback Trap
-
-On ESP32, `GPIO_MODE_OUTPUT` disables the input buffer. `gpio_get_level()` on an output-only pin **always returns 0** regardless of the actual output level. This makes CE readback diagnostics show `gpio_get_level()=0` even when the pin is physically HIGH.
-
-### Prevention
-
-```cpp
-// BROKEN — output-only, gpio_get_level() always returns 0
-gpio_config_t gpio_cfg = {
-    .mode = GPIO_MODE_OUTPUT,  // ← input buffer disabled
-};
-
-// CORRECT — input-output, gpio_get_level() returns actual pad level
-gpio_config_t gpio_cfg = {
-    .mode = GPIO_MODE_INPUT_OUTPUT,  // ← input buffer enabled
-};
-```
-
-Also note: GPIO5 is SPI3_HOST's native IO_MUX CS0 pin. If using SPI3_HOST and CE=GPIO5, the SPI driver internally enables IO_MUX CS0 (cs0_dis=0). While `PIN_FUNC_GPIO` disconnects the IO_MUX signal from the pad, consider moving CE to a non-IOMUX pin (e.g., GPIO4) for maximum safety.
+After fixing any nRF24L01+ bug, you MUST ask:
+- Why was this bug missed?
+- What procedural safeguard would have caught it?
+- Update the skill or the relevant learning doc with the lesson.
