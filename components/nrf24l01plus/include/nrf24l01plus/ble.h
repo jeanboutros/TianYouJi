@@ -136,5 +136,69 @@ static constexpr uint8_t PDU_LENGTH_MASK = 0x3F; ///< Bits [5:0] of PDU header b
  */
 const char *pdu_type_name(BleAdvPduType t);
 
+/**
+ * @brief Extract the advertiser address (AdvA) from a dewhitten BLE PDU.
+ *
+ * For ADV_IND, ADV_DIRECT_IND, ADV_NONCONN_IND, SCAN_RSP, and ADV_SCAN_IND
+ * PDU types, the AdvA occupies the first 6 bytes of the PDU body
+ * (buf[2] through buf[7]).  BLE transmits AdvA LSByte-first on air
+ * (Bluetooth Core Spec Vol 6 Part B §1.2), so buf[2] is the LSByte
+ * and buf[7] is the MSByte.
+ *
+ * This function copies the 6-byte AdvA into standard MAC notation order
+ * (MSByte first in out[0]), which is the conventional representation
+ * for Bluetooth addresses (e.g. "AA:BB:CC:DD:EE:FF").
+ *
+ * For ADV_EXT_IND (type 7), the AdvA position varies based on the
+ * extended header flags (Bluetooth Core Spec Vol 6 Part B §2.3.3).
+ * This function returns false for ADV_EXT_IND since parsing the
+ * extended header is required to locate AdvA — that is out of scope.
+ *
+ * For SCAN_REQ (type 3) and CONNECT_IND (type 5), there is no AdvA
+ * field in the PDU body at the fixed offset; the ScanA/InitA field
+ * comes first. This function returns false for these types.
+ *
+ * @code
+ *   // After dewhitening a received ADV_IND PDU:
+ *   uint8_t adv_addr[6];
+ *   if (nrf24::ble::adv_address(buf, adv_addr)) {
+ *       printf("AdvA: %s\n", nrf24::ble::format_address(adv_addr));
+ *   }
+ * @endcode
+ *
+ * @param buf   Dewhitten PDU buffer (buf[0]=type, buf[1]=length, buf[2+]=body).
+ *              Must point to at least 8 bytes for PDU types that have AdvA.
+ * @param out   Output array of 6 bytes, MSByte first (standard MAC notation).
+ *              out[0] receives the MSByte (buf[7]), out[5] receives the LSByte
+ *              (buf[2]).
+ * @return      true if PDU type has an AdvA at a fixed offset and it was
+ *              extracted successfully; false for types without a fixed-offset
+ *              AdvA (SCAN_REQ, CONNECT_IND, ADV_EXT_IND).
+ */
+bool adv_address(const uint8_t *buf, uint8_t out[6]);
+
+/**
+ * @brief Format a 6-byte BLE address as a standard MAC string.
+ *
+ * Produces a string in standard MAC notation (MSByte first,
+ * colon-separated uppercase hex).  The caller must ensure the
+ * returned pointer is used before the next call to this function
+ * (static buffer, not thread-safe).
+ *
+ * @code
+ *   uint8_t addr[6] = {0xCA, 0xFE, 0xBA, 0xBE, 0x00, 0x01};
+ *   nrf24::ble::format_address(addr);  // "CA:FE:BA:BE:00:01"
+ *
+ *   uint8_t adv_addr[6];
+ *   nrf24::ble::adv_address(buf, adv_addr);
+ *   printf("AdvA: %s\n", nrf24::ble::format_address(adv_addr));
+ * @endcode
+ *
+ * @param addr  6-byte address in standard notation (addr[0]=MSByte).
+ * @return      Static string like "CA:FE:BA:BE:00:01" (uppercase hex,
+ *              colon-separated).  Valid until the next call to this function.
+ */
+const char *format_address(const uint8_t addr[6]);
+
 } // namespace ble
 } // namespace nrf24

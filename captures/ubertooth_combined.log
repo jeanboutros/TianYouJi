@@ -1,0 +1,53 @@
+BLE Advertising Transmitter
+  MAC Address:  CA:FE:BA:BE:00:01
+  Adv Data:     0201060B0954455354
+  Adv Data Len: 9 bytes
+  Channels:     [37, 38, 39]
+  PDU Type:     ADV_IND (0x00)
+  CRC Init:     0x555555 (advertising)
+  Access Addr:  0x8E89BED6
+
+  -> Channel 37 (2402 MHz)
+  [10 pkts, 0.9s] ch=37 freq=2402 MHz
+  [20 pkts, 1.9s] ch=37 freq=2402 MHz
+  [30 pkts, 2.9s] ch=37 freq=2402 MHz
+  -> Channel 38 (2426 MHz)
+  [40 pkts, 4.1s] ch=38 freq=2426 MHz
+  [50 pkts, 5.1s] ch=38 freq=2426 MHz
+  -> Channel 39 (2480 MHz)
+  [60 pkts, 6.3s] ch=39 freq=2480 MHz
+  [70 pkts, 7.3s] ch=39 freq=2480 MHz
+  [80 pkts, 8.3s] ch=39 freq=2480 MHz
+  -> Channel 37 (2402 MHz)
+  [90 pkts, 9.5s] ch=37 freq=2402 MHz
+  [100 pkts, 10.5s] ch=37 freq=2402 MHz
+  [110 pkts, 11.5s] ch=37 freq=2402 MHz
+  -> Channel 38 (2426 MHz)
+  [120 pkts, 12.7s] ch=38 freq=2426 MHz
+  [130 pkts, 13.7s] ch=38 freq=2426 MHz
+  [140 pkts, 14.7s] ch=38 freq=2426 MHz
+  -> Channel 39 (2480 MHz)
+  [150 pkts, 15.9s] ch=39 freq=2480 MHz
+  [160 pkts, 16.9s] ch=39 freq=2480 MHz
+  [170 pkts, 17.9s] ch=39 freq=2480 MHz
+  -> Channel 37 (2402 MHz)
+  [180 pkts, 19.1s] ch=37 freq=2402 MHz
+  [190 pkts, 20.1s] ch=37 freq=2402 MHz
+  -> Channel 38 (2426 MHz)
+  [200 pkts, 21.3s] ch=38 freq=2426 MHz
+  [210 pkts, 22.3s] ch=38 freq=2426 MHz
+  [220 pkts, 23.3s] ch=38 freq=2426 MHz
+  -> Channel 39 (2480 MHz)
+  [230 pkts, 24.5s] ch=39 freq=2480 MHz
+  [240 pkts, 25.5s] ch=39 freq=2480 MHz
+  [250 pkts, 26.5s] ch=39 freq=2480 MHz
+  -> Channel 37 (2402 MHz)
+  [260 pkts, 27.7s] ch=37 freq=2402 MHz
+  [270 pkts, 28.7s] ch=37 freq=2402 MHz
+  [280 pkts, 29.7s] ch=37 freq=2402 MHz
+
+  Timeout reached (30.0s)
+
+Stopping Ubertooth TX...
+  Sent ~282 packets in 30.3s
+  Ubertooth stopped.

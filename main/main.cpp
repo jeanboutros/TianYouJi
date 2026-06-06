@@ -577,10 +577,16 @@ static void ble_sniffer_task(void *arg)
                 uint8_t pdu_len = buf[1] & nrf24::ble::PDU_LENGTH_MASK;
                 const char *type_name = nrf24::ble::pdu_type_name(pdu_type);
 
-                printf("[ch%u] %-17s  %02X:%02X:%02X:%02X:%02X:%02X  len=%u\n",
-                       ble_ch, type_name,
-                       buf[7], buf[6], buf[5], buf[4], buf[3], buf[2],
-                       pdu_len);
+                uint8_t adv_addr[6];
+                if (nrf24::ble::adv_address(buf, adv_addr)) {
+                    printf("[ch%u] %-17s  %s  len=%u\n",
+                           ble_ch, type_name,
+                           nrf24::ble::format_address(adv_addr),
+                           pdu_len);
+                } else {
+                    /* PDU type without a fixed-offset AdvA (SCAN_REQ, CONNECT_IND, ADV_EXT_IND) */
+                    printf("[ch%u] %-17s  len=%u\n", ble_ch, type_name, pdu_len);
+                }
 
                 /* For ADV_EXT_IND (BLE 5.0+), print extended header info.
                  * Per Bluetooth Core Spec Vol 6 Part B §2.3.3:

@@ -585,3 +585,250 @@ TEST(Dewhiten, SwapbitsAndWhiteningAreOrthogonal) {
     EXPECT_NE(swapbits(0x0F), 0x0F) << "swapbits should change 0x0F";
     EXPECT_EQ(swapbits(0x0F), 0xF0) << "swapbits(0x0F) should be 0xF0";
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * adv_address() tests
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+/** @brief Helper: build a minimal PDU buffer for a given type.
+ *
+ * Creates an 8-byte buffer with the PDU type in byte 0, length in
+ * byte 1, and AdvA bytes in buf[2..7].  The AdvA is set to a known
+ * pattern for extraction testing: {0x01, 0x23, 0x45, 0x67, 0x89, 0xAB}
+ * in LSByte-first on-air order, which should extract as
+ * {0xAB, 0x89, 0x67, 0x45, 0x23, 0x01} in standard MAC notation.
+ *
+ * @param type   PDU type value (bits [3:0] of header byte 0).
+ * @param buf    Output buffer, must be at least 8 bytes.
+ */
+static void make_pdu(uint8_t type, uint8_t buf[8])
+{
+    /* Header byte: type in bits [3:0], TxAdd=0, RxAdd=0 */
+    buf[0] = type & 0x0F;
+    buf[1] = 0x06; /* PDU length = 6 (AdvA only) */
+    /* AdvA in on-air LSByte-first order:
+     * buf[2] = LSByte = 0x01, buf[7] = MSByte = 0xAB */
+    buf[2] = 0x01; /* LSByte */
+    buf[3] = 0x23;
+    buf[4] = 0x45;
+    buf[5] = 0x67;
+    buf[6] = 0x89;
+    buf[7] = 0xAB; /* MSByte */
+}
+
+/** @brief adv_address correctly extracts AdvA from ADV_IND (type 0).
+ *
+ * ADV_IND has AdvA in buf[2..7] (LSByte-first on air).
+ * Standard MAC notation writes MSByte first, so:
+ *   buf[7]:buf[6]:buf[5]:buf[4]:buf[3]:buf[2] → out[0]...out[5].
+ */
+TEST(AdvAddress, AdvInd) {
+    uint8_t buf[8];
+    make_pdu(0x00, buf); /* ADV_IND */
+    uint8_t out[6] = {0};
+    EXPECT_TRUE(adv_address(buf, out));
+
+    /* buf[2]=0x01, buf[3]=0x23, buf[4]=0x45, buf[5]=0x67, buf[6]=0x89, buf[7]=0xAB
+     * Standard MAC order: MSByte first → {0xAB, 0x89, 0x67, 0x45, 0x23, 0x01} */
+    EXPECT_EQ(out[0], 0xAB);
+    EXPECT_EQ(out[1], 0x89);
+    EXPECT_EQ(out[2], 0x67);
+    EXPECT_EQ(out[3], 0x45);
+    EXPECT_EQ(out[4], 0x23);
+    EXPECT_EQ(out[5], 0x01);
+}
+
+/** @brief adv_address correctly extracts AdvA from ADV_DIRECT_IND (type 1). */
+TEST(AdvAddress, AdvDirectInd) {
+    uint8_t buf[8];
+    make_pdu(0x01, buf); /* ADV_DIRECT_IND */
+    uint8_t out[6] = {0};
+    EXPECT_TRUE(adv_address(buf, out));
+    EXPECT_EQ(out[0], 0xAB);
+    EXPECT_EQ(out[5], 0x01);
+}
+
+/** @brief adv_address correctly extracts AdvA from ADV_NONCONN_IND (type 2). */
+TEST(AdvAddress, AdvNonconnInd) {
+    uint8_t buf[8];
+    make_pdu(0x02, buf); /* ADV_NONCONN_IND */
+    uint8_t out[6] = {0};
+    EXPECT_TRUE(adv_address(buf, out));
+    EXPECT_EQ(out[0], 0xAB);
+    EXPECT_EQ(out[5], 0x01);
+}
+
+/** @brief adv_address correctly extracts AdvA from SCAN_RSP (type 4). */
+TEST(AdvAddress, ScanRsp) {
+    uint8_t buf[8];
+    make_pdu(0x04, buf); /* SCAN_RSP */
+    uint8_t out[6] = {0};
+    EXPECT_TRUE(adv_address(buf, out));
+    EXPECT_EQ(out[0], 0xAB);
+    EXPECT_EQ(out[5], 0x01);
+}
+
+/** @brief adv_address correctly extracts AdvA from ADV_SCAN_IND (type 6). */
+TEST(AdvAddress, AdvScanInd) {
+    uint8_t buf[8];
+    make_pdu(0x06, buf); /* ADV_SCAN_IND */
+    uint8_t out[6] = {0};
+    EXPECT_TRUE(adv_address(buf, out));
+    EXPECT_EQ(out[0], 0xAB);
+    EXPECT_EQ(out[5], 0x01);
+}
+
+/** @brief adv_address returns false for SCAN_REQ (type 3) — no AdvA. */
+TEST(AdvAddress, ScanReq_ReturnsFalse) {
+    uint8_t buf[8];
+    make_pdu(0x03, buf); /* SCAN_REQ */
+    uint8_t out[6] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
+    EXPECT_FALSE(adv_address(buf, out));
+    /* Output should not be modified on failure */
+    EXPECT_EQ(out[0], 0xFF);
+    EXPECT_EQ(out[5], 0xFF);
+}
+
+/** @brief adv_address returns false for CONNECT_IND (type 5) — no AdvA. */
+TEST(AdvAddress, ConnectInd_ReturnsFalse) {
+    uint8_t buf[8];
+    make_pdu(0x05, buf); /* CONNECT_IND */
+    uint8_t out[6] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
+    EXPECT_FALSE(adv_address(buf, out));
+    EXPECT_EQ(out[0], 0xFF);
+    EXPECT_EQ(out[5], 0xFF);
+}
+
+/** @brief adv_address returns false for ADV_EXT_IND (type 7) — variable offset. */
+TEST(AdvAddress, AdvExtInd_ReturnsFalse) {
+    uint8_t buf[8];
+    make_pdu(0x07, buf); /* ADV_EXT_IND */
+    uint8_t out[6] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
+    EXPECT_FALSE(adv_address(buf, out));
+    EXPECT_EQ(out[0], 0xFF);
+    EXPECT_EQ(out[5], 0xFF);
+}
+
+/** @brief adv_address preserves full byte order reversal (end-to-end verification).
+ *
+ * Use a realistic ADV_IND PDU with a known BLE address:
+ *   On-air LSByte-first AdvA: {0xC0, 0xAA, 0x18, 0xEF, 0xFF, 0xCA}
+ *   Standard MAC notation:       {0xCA, 0xFF, 0xEF, 0x18, 0xAA, 0xC0}
+ *   → expected string: "CA:FF:EF:18:AA:C0"
+ */
+TEST(AdvAddress, FullByteOrderReversal) {
+    uint8_t buf[8] = {
+        0x00,  /* PDU type: ADV_IND */
+        0x06,  /* PDU length: 6 */
+        0xC0,  /* AdvA LSByte */
+        0xAA,
+        0x18,
+        0xEF,
+        0xFF,
+        0xCA   /* AdvA MSByte */
+    };
+    uint8_t out[6] = {0};
+    EXPECT_TRUE(adv_address(buf, out));
+
+    EXPECT_EQ(out[0], 0xCA);  /* MSByte */
+    EXPECT_EQ(out[1], 0xFF);
+    EXPECT_EQ(out[2], 0xEF);
+    EXPECT_EQ(out[3], 0x18);
+    EXPECT_EQ(out[4], 0xAA);
+    EXPECT_EQ(out[5], 0xC0);  /* LSByte */
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * format_address() tests
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+/** @brief format_address produces standard MAC notation with uppercase hex. */
+TEST(FormatAddress, StandardMacNotation) {
+    uint8_t addr[6] = {0xCA, 0xFE, 0xBA, 0xBE, 0x00, 0x01};
+    const char *result = format_address(addr);
+    EXPECT_STREQ(result, "CA:FE:BA:BE:00:01");
+}
+
+/** @brief format_address handles all-zero address. */
+TEST(FormatAddress, AllZeros) {
+    uint8_t addr[6] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+    const char *result = format_address(addr);
+    EXPECT_STREQ(result, "00:00:00:00:00:00");
+}
+
+/** @brief format_address handles all-FF address. */
+TEST(FormatAddress, AllFFs) {
+    uint8_t addr[6] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
+    const char *result = format_address(addr);
+    EXPECT_STREQ(result, "FF:FF:FF:FF:FF:FF");
+}
+
+/** @brief format_address uses uppercase hex for digits A-F. */
+TEST(FormatAddress, UppercaseHex) {
+    uint8_t addr[6] = {0xAB, 0xCD, 0xEF, 0x12, 0x34, 0x56};
+    const char *result = format_address(addr);
+    EXPECT_STREQ(result, "AB:CD:EF:12:34:56");
+}
+
+/** @brief format_address returns a static buffer (not thread-safe, but testable).
+ *
+ * Two consecutive calls overwrite the same static buffer.
+ * Verify the second call's result is correct AND the first result is gone.
+ */
+TEST(FormatAddress, StaticBufferOverwrite) {
+    uint8_t addr1[6] = {0x11, 0x22, 0x33, 0x44, 0x55, 0x66};
+    uint8_t addr2[6] = {0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF};
+
+    const char *result1 = format_address(addr1);
+    EXPECT_STREQ(result1, "11:22:33:44:55:66");
+
+    /* Second call overwrites the static buffer */
+    const char *result2 = format_address(addr2);
+    EXPECT_STREQ(result2, "AA:BB:CC:DD:EE:FF");
+
+    /* result1 now points to the overwritten buffer */
+    EXPECT_STREQ(result1, "AA:BB:CC:DD:EE:FF");
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * Integrated adv_address + format_address test
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+/** @brief End-to-end: extract AdvA from PDU, then format as string.
+ *
+ * Simulates the actual usage pattern from main.cpp:
+ *   adv_address(buf, addr) → format_address(addr) → printf.
+ */
+TEST(AdvAddress, IntegrationWithFormatAddress) {
+    /* ADV_IND PDU with AdvA = {0xCA, 0xFF, 0xEF, 0x18, 0xAA, 0xC0}
+     * in standard MAC notation (MSByte-first). */
+    uint8_t buf[8] = {
+        0x00,  /* ADV_IND */
+        0x06,
+        0xC0,  /* LSByte on air */
+        0xAA,
+        0x18,
+        0xEF,
+        0xFF,
+        0xCA   /* MSByte on air */
+    };
+
+    uint8_t addr[6];
+    ASSERT_TRUE(adv_address(buf, addr));
+    EXPECT_STREQ(format_address(addr), "CA:FF:EF:18:AA:C0");
+}
+
+/** @brief End-to-end: PDU type without AdvA prints no address. */
+TEST(AdvAddress, IntegrationWithFormatAddress_NoAdvaType) {
+    /* SCAN_REQ PDU — no AdvA */
+    uint8_t buf[8] = {
+        0x03,  /* SCAN_REQ */
+        0x06,
+        0x01, 0x23, 0x45, 0x67, 0x89, 0xAB
+    };
+
+    uint8_t addr[6] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
+    EXPECT_FALSE(adv_address(buf, addr));
+    /* addr should not have been modified */
+    EXPECT_EQ(addr[0], 0xFF);
+}

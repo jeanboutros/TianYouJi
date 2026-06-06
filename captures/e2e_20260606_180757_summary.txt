@@ -1,0 +1,43 @@
+==================================================================
+  End-to-End Cross-Validation Test
+  Timestamp: 20260606_180757
+==================================================================
+
+-- Configuration ------------------------------------------------
+  MAC (TX argument):  CA:FE:BA:BE:00:01
+  MAC (reversed):     01:00:BE:BA:FE:CA
+  Search pattern:     CA:FE:BA:BE:00:01 (standard order)
+  Adv Data:           020106080945324554455354
+  Channels:           37,38,39
+  Duration:           20s
+  ESP32 Port:         /dev/ttyUSB0
+  nRF Sniffer:        YES (/dev/ttyACM0)
+
+-- Captured Files -----------------------------------------------
+  ESP32 Log:          /home/huyang/projects/esp32/captures/e2e_20260606_180757_esp32.log
+  nRF PCAP:           /home/huyang/projects/esp32/captures/e2e_20260606_180757_nrf.pcap
+  Summary:            /home/huyang/projects/esp32/captures/e2e_20260606_180757_summary.txt
+
+-- ESP32 Log Analysis -------------------------------------------
+  Total log lines:             4031
+  Ubertooth MAC matches:       4  (searching for CA:FE:BA:BE:00:01 (standard order))
+  Total PDU types decoded:      879
+    ADV_IND:                   624
+    ADV_NONCONN_IND:           178
+    ADV_SCAN_IND:              70
+    ADV_EXT_IND:               5
+    CONNECT_IND:               0
+    UNKNOWN:                   2
+
+-- nRF Sniffer Analysis -----------------------------------------
+  Total BLE frames:            10038
+  Ubertooth MAC matches:        68  (searching for ca:fe:ba:be:00:01 or 01:00:be:ba:fe:ca)
+
+-- Cross-Validation ---------------------------------------------
+  ESP32 received Ubertooth:    YES (4 matches)
+  nRF received Ubertooth:       YES (68 matches)
+  Cross-validation:             YES
+
+-- Result -------------------------------------------------------
+  [PASS] ESP32 nRF24L01+ sniffer received Ubertooth packets!
+==================================================================

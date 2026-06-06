@@ -1,0 +1,23 @@
+==================================================================
+  End-to-End Cross-Validation Test
+  Timestamp: 20260606_180648
+==================================================================
+
+-- Configuration ------------------------------------------------
+  MAC (TX argument):  CA:FE:BA:BE:00:01
+  MAC (reversed):     01:00:BE:BA:FE:CA
+  Search pattern:     01:00:BE:BA:FE:CA (byte-reversed)
+  Adv Data:           020106080945324554455354
+  Channels:           37,38,39
+  Duration:           15s
+  ESP32 Port:         /dev/ttyUSB0
+  nRF Sniffer:       NO
+
+-- Captured Files -----------------------------------------------
+  ESP32 Log:          /home/huyang/projects/esp32/captures/e2e_20260606_180648_esp32.log
+  Summary:            /home/huyang/projects/esp32/captures/e2e_20260606_180648_summary.txt
+
+-- ESP32 Log Analysis -------------------------------------------
+  Total log lines:             3286
+  Ubertooth MAC matches:       0
+0  (searching for 01:00:BE:BA:FE:CA (byte-reversed))

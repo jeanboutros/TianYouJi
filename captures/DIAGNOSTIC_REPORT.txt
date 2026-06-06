@@ -1,0 +1,158 @@
+================================================================
+LIVE BLE DIAGNOSTIC TEST — ESP32 + Ubertooth TX + nRF Sniffer
+Date: 2026-06-06
+================================================================
+
+HARDWARE SETUP:
+  ESP32 + nRF24L01+   /dev/ttyUSB0   (BLE sniffer, BLE_DIAG=1)
+  Ubertooth One       USB            (BLE TX: CA:FE:BA:BE:00:01)
+  nRF BLE Sniffer     /dev/ttyACM0   (reference capture)
+
+================================================================
+TEST RUNS
+================================================================
+
+TEST 1: ESP32 solo capture (no Ubertooth TX)
+  File: diag_live_test.log (520KB)
+  Duration: ~35s
+  Packets decoded: 1999 (all FIFO artifacts — NOT real BLE data)
+
+TEST 2: ESP32 + Ubertooth TX simultaneous (30s)
+  File: diag_combined_test.log (473KB)
+  Ubertooth TX: ~282 packets sent (ch37→38→39 cycle, 3s each)
+  Packets decoded: 1820 (all FIFO artifacts — NOT real BLE data)
+
+TEST 3: nRF Sniffer solo capture (no Ubertooth TX)
+  File: diag_live_test_nrf.pcap (1.1MB)
+  Duration: ~35s
+  Frames: 15,157 | Unique MACs: 374
+
+TEST 4: nRF Sniffer + Ubertooth TX simultaneous (30s)
+  File: ubertooth_nrf_combined.pcap (1.2MB)
+  Frames: 17,260 | Unique MACs: 457
+  Ubertooth packets captured: 84 (ch37:71, ch38:8, ch39:5)
+
+================================================================
+RESULTS SUMMARY
+================================================================
+
+1. Total packets received by ESP32: ~2,000 (heartbeat: 9,322 polls)
+   ALL are FIFO artifacts — the nRF24 is NOT receiving real BLE payloads.
+
+2. RPD signal=1 count: 1 (out of 781 readings, 0.1%)
+   RPD signal=0 count: 780
+   The single signal=1 occurred on ch38 while Ubertooth was TXing there.
+   → nRF24 CAN detect Ubertooth RF energy, but almost never triggers.
+
+3. Ubertooth MAC in ESP32 output: NO
+   Searched for "CA:FE:BA:BE" and "BE:BA:FE:CA" — zero matches.
+
+4. Ubertooth MAC in nRF Sniffer capture: YES
+   84 packets with CA:FE:BA:BE:00:01 captured by nRF Sniffer.
+
+5. Distinct real BLE MACs seen by ESP32: 0
+   All "MACs" are FIFO artifacts from dewhitening constant-byte FIFO fills:
+     E5:E3:89:FA:20:35 = 0xFE*32 dewhittened on ch39
+     CF:19:D8:42:DE:28 = 0xFE*32 dewhittened on ch37
+     F0:9E:A1:26:5F:3B = 0xFE*32 dewhittened on ch38
+     8F:E1:DE:59:20:44 = 0x00*32 dewhittened on ch38
+     9A:9C:F6:85:5F:4A = 0x00*32 dewhittened on ch39
+     59:37:08:BE:AE:CD = 6B7D91... dewhittened on ch38 (1 real capture?)
+
+6. Distinct real BLE MACs seen by nRF Sniffer: 374-457
+
+7. AirTag identification (via nRF Sniffer):
+   MAC 48:9d:78:d6:a4:5f (800 pkts) — Apple 0x004C, Nearby Info type 0x10
+   MAC 5b:39:01:b2:29:e8 (790 pkts) — Apple 0x004C, Nearby Info type 0x10
+   Both are likely Find My network accessories (AirTags or similar).
+
+8. Raw FIFO patterns (ESP32):
+     0xFE*32 — 1814 occurrences (99.5%) — stale/default FIFO content
+     0x00*32 — 4 occurrences — secondary artifact
+     6B7D91... — 1 occurrence — address bytes leaked into FIFO
+
+================================================================
+CRITICAL FINDING: FIFO ARTIFACT ANALYSIS
+================================================================
+
+The nRF24L01+ RX FIFO contains 0xFE (11111110) on ALL 32 bytes of
+nearly every "received" packet. After dewhitening, this constant
+pattern produces seemingly valid but completely fake BLE PDU headers
+and MAC addresses that differ by channel (due to different LFSR seeds).
+
+PROOF BY SIMULATION:
+  ch37: 0xFE*32 → ADV_NONCONN_IND  CF:19:D8:42:DE:28  len=45
+  ch38: 0xFE*32 → UNKNOWN(9)      F0:9E:A1:26:5F:3B  len=58
+  ch39: 0xFE*32 → ADV_IND         E5:E3:89:FA:20:35  len=8
+
+  ch38: 0x00*32 → ADV_SCAN_IND    8F:E1:DE:59:20:44  len=5
+  ch39: 0x00*32 → UNKNOWN(15)     9A:9C:F6:85:5F:4A  len=55
+
+  These EXACTLY match what the ESP32 outputs. The dewhitening
+  algorithm is correct; the input data is wrong.
+
+================================================================
+ROOT CAUSE HYPOTHESIS
+================================================================
+
+The nRF24L01+ is triggering RX_DR flags (data-ready interrupts) on
+false address matches in RF noise, but the actual FIFO content is a
+stale/default value (0xFE) rather than real BLE packet data.
+
+Possible mechanisms:
+1. False address correlation: 4-byte address (0x6B7D9171) is only
+   32 bits wide — RF noise can produce this pattern by chance,
+   especially with CRC disabled (no packet integrity check).
+2. FIFO not properly flushed: the RX FIFO may contain residual data
+   from a previous cycle. The 0xFE value could be uninitialized
+   FIFO memory or the physical pattern of the nRF24's demodulator
+   output in the absence of a valid signal.
+3. SPI read ordering: if flush_rx() is called after read_payload()
+   but before the next packet arrives, the FIFO should be empty.
+   However, if CE manipulation or register writes interfere with
+   the FIFO flush timing, stale data could persist.
+4. The 0xFE = 11111110 pattern is suspicious: it's almost all 1s
+   (idle GFSK channel). The single 0 bit could be an edge effect
+   from the address matching circuitry.
+
+================================================================
+RECOMMENDED NEXT STEPS
+================================================================
+
+1. ADD FIFO_STATUS register diagnostic:
+   Read FIFO_STATUS before read_payload() to check:
+   - RX_EMPTY flag: is there actually data in the FIFO?
+   - RX_FULL flag
+   - How many payloads are queued (bits 5:6)?
+
+2. VERIFY flush_rx() implementation:
+   Read FIFO_STATUS after flush_rx() to confirm FIFO is actually
+   empty. The FLUSH_RX command (0xE2) may need a longer delay.
+
+3. INVESTIGATE CE timing:
+   After switch_channel(), CE transitions from low to high.
+   The nRF24 needs 130µs to transition to RX mode (Standby-I→RX).
+   Is the task delay (1ms / vTaskDelay(1)) sufficient?
+
+4. CONSIDER EN_CRC impact:
+   With CRC disabled, the nRF24 has no integrity check on the
+   "payload". Any 32 bytes after an address match are accepted.
+   While BLE has its own CRC, the nRF24 doesn't know about it.
+   Could enabling nRF24 CRC (2-byte) help filter false matches?
+   (BLE CRC is 3 bytes, so nRF24 CRC won't match — but enabling
+   it might at least reject completely garbage payloads.)
+
+5. DIRECT SPI LOOPBACK TEST:
+   Put the nRF24 in TX mode, send a known payload, then switch to
+   RX mode on the same channel to verify the SPI/radio path works
+   at all. This would isolate whether the issue is RF reception or
+   the FIFO readback mechanism.
+
+6. COMPARE WITH KNOWN WORKING nRF24 BLE SNIFFERS:
+   The Dmitry Grinberg original code uses slightly different register
+   settings. Compare:
+   - Address width (we use 4, some use 5 with padding byte 0x71)
+   - CRC configuration
+   - Auto-ack setting (AA should be off, but with no AA and no CRC,
+     ShockBurst becomes very promiscuous)
+   - Data rate (1 Mbps is correct for BLE)

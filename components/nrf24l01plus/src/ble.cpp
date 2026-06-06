@@ -63,5 +63,78 @@ const char *pdu_type_name(BleAdvPduType t)
     return unknown_buf;
 }
 
+/**
+ * @brief Check whether a BLE advertising PDU type carries a fixed-offset AdvA.
+ *
+ * Per Bluetooth Core Spec Vol 6 Part B §2.3:
+ * - ADV_IND (0), ADV_DIRECT_IND (1), ADV_NONCONN_IND (2),
+ *   SCAN_RSP (4), ADV_SCAN_IND (6) all have AdvA in the first 6 bytes
+ *   of the PDU body.
+ * - SCAN_REQ (3) and CONNECT_IND (5) have ScanA/InitA first, not AdvA.
+ * - ADV_EXT_IND (7) has AdvA at a variable offset in the extended header,
+ *   so it cannot be extracted without parsing the extended header flags.
+ *
+ * @param t  PDU type code.
+ * @return   true if the PDU type has AdvA at the fixed buf[2..7] offset.
+ */
+static bool has_fixed_offset_adva(BleAdvPduType t)
+{
+    switch (t) {
+    case BleAdvPduType::AdvInd:
+    case BleAdvPduType::AdvDirectInd:
+    case BleAdvPduType::AdvNonconnInd:
+    case BleAdvPduType::ScanRsp:
+    case BleAdvPduType::AdvScanInd:
+        return true;
+    case BleAdvPduType::ScanReq:
+    case BleAdvPduType::ConnectInd:
+    case BleAdvPduType::AdvExtInd:
+        return false;
+    }
+    /* Unreachable for valid enum values, but compilers may warn without this. */
+    return false;
+}
+
+bool adv_address(const uint8_t *buf, uint8_t out[6])
+{
+    auto pdu_type = static_cast<BleAdvPduType>(buf[0] & PDU_TYPE_MASK);
+
+    if (!has_fixed_offset_adva(pdu_type)) {
+        return false;
+    }
+
+    /* BLE transmits AdvA LSByte-first on air (Vol 6 Part B §1.2).
+     * After dewhitening, buf[2] = first on-air byte = LSByte,
+     * buf[7] = last on-air byte = MSByte.
+     * Standard MAC notation writes MSByte first:
+     *   out[0] = buf[7] (MSByte), out[5] = buf[2] (LSByte). */
+    out[0] = buf[7];
+    out[1] = buf[6];
+    out[2] = buf[5];
+    out[3] = buf[4];
+    out[4] = buf[3];
+    out[5] = buf[2];
+
+    return true;
+}
+
+/* Static buffer for format_address().
+ * "XX:XX:XX:XX:XX:XX\0" = 17 chars + NUL = 18 bytes.
+ * Not thread-safe — acceptable for single-threaded sniffer output. */
+static char addr_buf[18];
+
+const char *format_address(const uint8_t addr[6])
+{
+    std::snprintf(addr_buf, sizeof(addr_buf),
+                  "%02X:%02X:%02X:%02X:%02X:%02X",
+                  static_cast<unsigned>(addr[0]),
+                  static_cast<unsigned>(addr[1]),
+                  static_cast<unsigned>(addr[2]),
+                  static_cast<unsigned>(addr[3]),
+                  static_cast<unsigned>(addr[4]),
+                  static_cast<unsigned>(addr[5]));
+    return addr_buf;
+}
+
 } // namespace ble
 } // namespace nrf24
