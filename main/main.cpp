@@ -129,9 +129,5 @@ extern "C" void app_main(void)
 
     nrf24::diag::verify_ble_rx(radio, rx_config);
 
-    /* Release MOSI to reduce 2.4 GHz noise during RX-only operation */
-    gpio_set_direction(hal.mosi_pin(), GPIO_MODE_INPUT);
-    printf("MOSI (GPIO%d) released to input -- RF noise reduced\n", hal.mosi_pin());
-
     xTaskCreatePinnedToCore(ble_sniffer_task, "ble_sniffer", 4096, NULL, 5, NULL, 1);
 }
