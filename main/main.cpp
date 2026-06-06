@@ -23,6 +23,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "esp_system.h"
+#include "esp_timer.h"
 #include "driver/gpio.h"
 #include "nrf24_espidf/hal_espidf.h"
 #include <nrf24l01plus/driver.h>
@@ -182,6 +183,301 @@ static void print_register_diagnostics(nrf24::Driver &radio)
 
     printf("=== End register read-back ===\n\n");
 }
+
+/* --- CE diagnostic functions (under BLE_DIAG guard) ------------------- */
+
+#if BLE_DIAG
+
+/**
+ * @brief Verify CE GPIO readback and measure CE transition timing.
+ *
+ * Performs a complete CE LOW→HIGH→LOW cycle, reading the GPIO level
+ * back after each transition using gpio_get_level().  This confirms
+ * the ESP32 GPIO hardware is actually driving the CE pin.  Also
+ * measures microsecond-precision transition timing using
+ * esp_timer_get_time().
+ *
+ * The test starts by forcing CE LOW (known baseline), then:
+ * 1. Reads GPIO level → should be 0
+ * 2. Sets CE HIGH, reads back → should be 1, captures timestamp
+ * 3. Waits 1 ms (minimum CE high for RX mode entry)
+ * 4. Sets CE LOW, reads back → should be 0, captures timestamp
+ *
+ * Finally restores CE HIGH so the nRF24 remains in RX mode.
+ *
+ * @param radio  Driver instance (used for ce_high/ce_low).
+ * @param ce_pin GPIO number for CE (used for gpio_get_level readback).
+ */
+static void diag_ce_readback(nrf24::Driver &radio, gpio_num_t ce_pin)
+{
+    printf("\n=== CE GPIO readback & timing test ===\n");
+
+    /* Force CE LOW as baseline */
+    radio.ce_low();
+    vTaskDelay(1);
+
+    int level_before = gpio_get_level(ce_pin);
+    printf("  CE initial (forced LOW): gpio_get_level=%d  %s\n",
+           level_before,
+           level_before == 0 ? "[OK]" : "[FAIL: expected 0]");
+
+    /* CE HIGH transition with timestamp */
+    int64_t t_low_to_high_start = esp_timer_get_time();
+    radio.ce_high();
+    int64_t t_low_to_high_end = esp_timer_get_time();
+
+    int level_high = gpio_get_level(ce_pin);
+    printf("  CE HIGH: gpio_get_level=%d  %s  transition=%lld us\n",
+           level_high,
+           level_high == 1 ? "[OK]" : "[FAIL: expected 1]",
+           static_cast<long long>(t_low_to_high_end - t_low_to_high_start));
+
+    /* Hold CE high for 1 ms to satisfy nRF24 RX mode entry
+     * (datasheet §6.1 Table 6: CE=1 required for RX mode). */
+    vTaskDelay(pdMS_TO_TICKS(1));
+
+    /* CE LOW transition with timestamp */
+    int64_t t_high_to_low_start = esp_timer_get_time();
+    radio.ce_low();
+    int64_t t_high_to_low_end = esp_timer_get_time();
+
+    int level_low = gpio_get_level(ce_pin);
+    printf("  CE LOW:  gpio_get_level=%d  %s  transition=%lld us\n",
+           level_low,
+           level_low == 0 ? "[OK]" : "[FAIL: expected 0]",
+           static_cast<long long>(t_high_to_low_end - t_high_to_low_start));
+
+    /* Compute actual CE-high duration (includes vTaskDelay) */
+    int64_t ce_high_dur_us = t_high_to_low_start - t_low_to_high_end;
+    printf("  CE high duration: %lld us (%lld ms)\n",
+           static_cast<long long>(ce_high_dur_us),
+           static_cast<long long>(ce_high_dur_us / 1000));
+
+    /* Restore CE HIGH so the nRF24 re-enters RX mode */
+    radio.ce_high();
+    vTaskDelay(1);
+
+    int level_restored = gpio_get_level(ce_pin);
+    printf("  CE restored HIGH: gpio_get_level=%d  %s\n",
+           level_restored,
+           level_restored == 1 ? "[OK]" : "[FAIL: expected 1]");
+
+    printf("=== End CE readback test ===\n\n");
+}
+
+/**
+ * @brief Dump CONFIG and FIFO_STATUS registers alongside CE GPIO state.
+ *
+ * Reads the CONFIG register (PRIM_RX, PWR_UP bits) and FIFO_STATUS
+ * register (RX_EMPTY, RX_FULL, TX_EMPTY, TX_FULL, TX_REUSE), then
+ * reads the CE GPIO level.  Useful for verifying that the nRF24 is
+ * in the expected state (PWR_UP=1, PRIM_RX=1, CE=1 = RX mode) and
+ * that the FIFO state is consistent with the CE state.
+ *
+ * @param radio   Driver instance.
+ * @param ce_pin  GPIO number for CE (used for gpio_get_level).
+ */
+static void diag_config_and_fifo_with_ce(nrf24::Driver &radio, gpio_num_t ce_pin)
+{
+    printf("=== CONFIG + FIFO_STATUS with CE state ===\n");
+
+    auto cfg = radio.read_reg(nrf24::Config{});
+    auto fifo = radio.read_reg(nrf24::FifoStatus{});
+    int ce_level = gpio_get_level(ce_pin);
+
+    printf("  CONFIG:      PWR_UP=%u PRIM_RX=%u EN_CRC=%u CRCO=%u  (raw 0x%02X)\n",
+           static_cast<unsigned>(cfg.power_mode),
+           static_cast<unsigned>(cfg.primary),
+           static_cast<unsigned>(cfg.crc_mode),
+           static_cast<unsigned>(cfg.crc_encoding),
+           cfg.to_byte());
+    printf("  FIFO_STATUS: rx_empty=%u rx_full=%u tx_empty=%u tx_full=%u tx_reuse=%u  (raw 0x%02X)\n",
+           static_cast<unsigned>(fifo.rx_empty),
+           static_cast<unsigned>(fifo.rx_full),
+           static_cast<unsigned>(fifo.tx_empty),
+           static_cast<unsigned>(fifo.tx_full),
+           static_cast<unsigned>(fifo.tx_reuse),
+           fifo.to_byte());
+    printf("  CE GPIO:     level=%d  %s\n",
+           ce_level,
+           ce_level == 1 ? "[OK: CE HIGH → RX mode active]"
+                         : "[WARN: CE LOW → nRF24 NOT in RX mode!]");
+
+    /* Cross-check: if PWR_UP=1, PRIM_RX=1, CE=1 → RX mode per datasheet §6.1 */
+    bool rx_mode = (cfg.power_mode == nrf24::PowerMode::Up)
+                && (cfg.primary == nrf24::PrimaryMode::RX)
+                && (ce_level == 1);
+    printf("  RX mode:     %s  %s\n",
+           rx_mode ? "ACTIVE" : "INACTIVE",
+           rx_mode ? "[OK: PWR_UP=1 + PRIM_RX=1 + CE=1]"
+                   : "[FAIL: not all conditions met for RX mode]");
+
+    printf("=== End CONFIG + FIFO_STATUS dump ===\n\n");
+}
+
+/**
+ * @brief Extended CE-high test: hold CE HIGH for 5 seconds on a single channel.
+ *
+ * Tunes to BLE advertising channel 37 (2402 MHz), flushes the RX FIFO,
+ * then holds CE HIGH for 5 full seconds while continuously polling
+ * RPD and FIFO_STATUS every 100 ms.  This test answers the question:
+ * "Does the nRF24 EVER receive anything when CE is held high continuously?"
+ *
+ * If RPD remains 0 for the entire 5 seconds, the issue is likely:
+ * - CE not actually HIGH (GPIO readback will show this)
+ * - Wrong frequency or data rate
+ * - No BLE traffic in range
+ * - Hardware fault (module, wiring, power supply)
+ *
+ * If RPD shows signal but FIFO stays empty, the issue is likely:
+ * - CRC rejection (EN_CRC forced on by EN_AA)
+ * - Address mismatch
+ * - Wrong payload width
+ *
+ * @param radio   Driver instance.
+ * @param ce_pin  GPIO number for CE (used for gpio_get_level).
+ */
+static void diag_extended_ce_test(nrf24::Driver &radio, gpio_num_t ce_pin)
+{
+    printf("\n=== Extended CE-high test (5 s on ch37) ===\n");
+
+    /* Step 1: Lower CE to reconfigure channel */
+    radio.ce_low();
+
+    /* Step 2: Tune to BLE advertising channel 37 (RF_CH=2, 2402 MHz) */
+    nrf24::RfCh rf_ch;
+    rf_ch.channel = nrf24::ble::channel_to_rf_ch(37);
+    radio.write_reg(rf_ch);
+    printf("  Tuned to ch37 (RF_CH=%u, freq=%u MHz)\n",
+           rf_ch.channel, 2400 + rf_ch.channel);
+
+    /* Step 3: Flush RX FIFO and clear interrupt flags */
+    radio.flush_rx();
+    nrf24::ble::clear_irq_flags(radio);
+
+    /* Step 4: Read baseline CONFIG and FIFO_STATUS before CE HIGH */
+    auto cfg_before = radio.read_reg(nrf24::Config{});
+    auto fifo_before = radio.read_reg(nrf24::FifoStatus{});
+    printf("  Before CE HIGH:\n");
+    printf("    CONFIG: PWR_UP=%u PRIM_RX=%u EN_CRC=%u  (raw 0x%02X)\n",
+           static_cast<unsigned>(cfg_before.power_mode),
+           static_cast<unsigned>(cfg_before.primary),
+           static_cast<unsigned>(cfg_before.crc_mode),
+           cfg_before.to_byte());
+    printf("    FIFO:  rx_empty=%u rx_full=%u  (raw 0x%02X)\n",
+           static_cast<unsigned>(fifo_before.rx_empty),
+           static_cast<unsigned>(fifo_before.rx_full),
+           fifo_before.to_byte());
+
+    /* Step 5: Assert CE HIGH with timestamp */
+    int64_t t_ce_high = esp_timer_get_time();
+    radio.ce_high();
+
+    /* Verify GPIO readback immediately after CE HIGH */
+    int ce_level = gpio_get_level(ce_pin);
+    printf("  CE HIGH at t=%lld us, gpio_get_level=%d  %s\n",
+           static_cast<long long>(t_ce_high),
+           ce_level,
+           ce_level == 1 ? "[OK]" : "[FAIL: CE not actually HIGH!]");
+
+    /* Step 6: Poll for 5 seconds, sampling every 100 ms */
+    static constexpr int POLL_INTERVAL_MS = 100;
+    static constexpr int POLL_COUNT = 50;  /* 5 s / 100 ms */
+    int rpd_hit_count = 0;
+    int fifo_data_count = 0;
+
+    for (int i = 0; i < POLL_COUNT; i++)
+    {
+        vTaskDelay(pdMS_TO_TICKS(POLL_INTERVAL_MS));
+
+        auto rpd = radio.read_reg(nrf24::Rpd{});
+        auto fifo = radio.read_reg(nrf24::FifoStatus{});
+        auto st = radio.read_reg(nrf24::Status{});
+
+        bool rpd_active = rpd.received_power;
+        bool fifo_has_data = !fifo.rx_empty;
+
+        if (rpd_active) rpd_hit_count++;
+        if (fifo_has_data) fifo_data_count++;
+
+        /* Only log if something changed or every 10th sample to reduce noise */
+        if (rpd_active || fifo_has_data || (i % 10 == 0))
+        {
+            int64_t t_now = esp_timer_get_time();
+            printf("  [%d/%d] t=%lld ms  RPD=%u  FIFO: rx_empty=%u rx_full=%u  "
+                   "STATUS: rx_dr=%u rx_p_no=%u  CE_gpio=%d\n",
+                   i + 1, POLL_COUNT,
+                   static_cast<long long>((t_now - t_ce_high) / 1000),
+                   static_cast<unsigned>(rpd.received_power),
+                   static_cast<unsigned>(fifo.rx_empty),
+                   static_cast<unsigned>(fifo.rx_full),
+                   static_cast<unsigned>(st.rx_dr),
+                   static_cast<unsigned>(st.rx_p_no),
+                   gpio_get_level(ce_pin));
+
+            /* If FIFO has data, read and dump the payload for analysis */
+            if (fifo_has_data)
+            {
+                uint8_t buf[NRF24_MAX_PAYLOAD];
+                radio.read_payload(buf, NRF24_MAX_PAYLOAD);
+                nrf24::ble::clear_irq_flags(radio);
+                radio.flush_rx();
+
+                printf("    payload:");
+                for (uint8_t j = 0; j < NRF24_MAX_PAYLOAD; j++)
+                {
+                    printf(" %02X", buf[j]);
+                }
+                printf("\n");
+            }
+        }
+    }
+
+    /* Step 7: Summary */
+    int64_t t_ce_low = esp_timer_get_time();
+    radio.ce_low();
+    int ce_level_after = gpio_get_level(ce_pin);
+
+    printf("  --- Summary ---\n");
+    printf("  CE HIGH duration: %lld ms\n",
+           static_cast<long long>((t_ce_low - t_ce_high) / 1000));
+    printf("  RPD hits: %d/%d samples (%.1f%%)\n",
+           rpd_hit_count, POLL_COUNT,
+           100.0 * rpd_hit_count / POLL_COUNT);
+    printf("  FIFO data: %d/%d samples (%.1f%%)\n",
+           fifo_data_count, POLL_COUNT,
+           100.0 * fifo_data_count / POLL_COUNT);
+    printf("  Final CE LOW: gpio_get_level=%d  %s\n",
+           ce_level_after,
+           ce_level_after == 0 ? "[OK]" : "[FAIL: expected 0]");
+
+    /* Diagnostic interpretation guidance */
+    if (rpd_hit_count == 0)
+    {
+        printf("  DIAG: RPD never triggered in 5 s — check:\n");
+        printf("    - Is CE actually HIGH? (GPIO readback above)\n");
+        printf("    - Is there BLE traffic in range?\n");
+        printf("    - Is the nRF24 module powered and functional?\n");
+    }
+    else if (fifo_data_count == 0)
+    {
+        printf("  DIAG: RPD triggered but FIFO always empty — check:\n");
+        printf("    - EN_CRC may be forced on (EN_AA override)\n");
+        printf("    - RX_ADDR_P0 may not match BLE access address\n");
+        printf("    - Payload width may be wrong\n");
+    }
+    else
+    {
+        printf("  DIAG: Data received successfully — CE and RX working\n");
+    }
+
+    /* Restore CE HIGH and re-tune to initial channel for sniffer task */
+    nrf24::ble::switch_channel(radio, 37);
+
+    printf("=== End extended CE-high test ===\n\n");
+}
+
+#endif /* BLE_DIAG */
 
 /* --- BLE sniffer task ----------------------------------------------- */
 
@@ -364,6 +660,21 @@ extern "C" void app_main(void)
 
     nrf24::diag::verify_ble_rx(radio, rx_config);
     print_register_diagnostics(radio);
+
+#if BLE_DIAG
+    /* CE GPIO readback verification and transition timing.
+     * Confirms the ESP32 GPIO hardware is actually driving CE HIGH/LOW. */
+    diag_ce_readback(radio, PIN_CE);
+
+    /* CONFIG + FIFO_STATUS dump with CE state.
+     * Cross-checks that PWR_UP=1, PRIM_RX=1, CE=1 → RX mode is active. */
+    diag_config_and_fifo_with_ce(radio, PIN_CE);
+
+    /* Extended CE-high test: 5 seconds on ch37 with continuous polling.
+     * Determines whether CE duration or signal detection is the issue
+     * when RPD=0 on most reads during normal scanning. */
+    diag_extended_ce_test(radio, PIN_CE);
+#endif
 
     xTaskCreatePinnedToCore(ble_sniffer_task, "ble_sniffer", 4096, NULL, 5, NULL, 1);
 }
