@@ -115,6 +115,62 @@ Ubertooth TX script options:
 
 ---
 
+## Tools & Scripts
+
+Utility scripts for BLE cross-validation testing and reference verification.
+
+### `tools/e2e_crossval_test.sh` — End-to-end BLE cross-validation test
+
+Transmits known BLE ADV_IND packets from Ubertooth One and verifies reception by both the ESP32 nRF24L01+ sniffer and an nRF52840 Sniffer Dongle. Ideal for CI-style validation.
+
+```bash
+# Default: MAC CA:FE:BA:BE:00:01, 30 s timeout
+./tools/e2e_crossval_test.sh
+
+# With nRF Sniffer cross-validation, 60 s timeout
+./tools/e2e_crossval_test.sh --nrf -t 60
+
+# Skip flash, verbose output
+./tools/e2e_crossval_test.sh --no-flash -v
+```
+
+Exit codes: 0 = PASS, 1 = ESP32 fail only, 2 = both fail, 3 = error.
+
+### `tools/ble_diag_test.sh` — Automated BLE diagnostic test
+
+Flashes the ESP32, captures serial output, transmits test packets from Ubertooth, and analyses results with a summary report and next-step suggestions.
+
+```bash
+# Custom MAC and ADV data, 30 s test
+./tools/ble_diag_test.sh -m CA:FE:BA:BE:00:01 -d 0201060B0954455354 -t 30
+
+# With nRF Sniffer, verbose
+./tools/ble_diag_test.sh --nrf --nrf-port /dev/ttyACM0 -v
+```
+
+### `tools/ubertooth_btle_tx.py` — Ubertooth BLE advertising transmitter
+
+Transmits configurable ADV_IND / ADV_NONCONN_IND packets on channels 37/38/39 with a specified MAC address. Used for cross-validation and diagnostic testing.
+
+```bash
+# Transmit on channel 37 with custom MAC, 100 ms interval
+python3 tools/ubertooth_btle_tx.py --channel 37 --mac CA:FE:BA:BE:00:01 --interval 100
+```
+
+### `docs/pipeline/scripts/ble_whiten_reference.py` — BLE whitening Python reference
+
+Python reference implementation for BLE data whitening/dewhitening LFSR algorithm. Used for verification against the C++ `dewhiten()` implementation.
+
+```bash
+# Run round-trip consistency tests
+python3 docs/pipeline/scripts/ble_whiten_reference.py --roundtrip
+
+# Print whitening vector for channel 37
+python3 docs/pipeline/scripts/ble_whiten_reference.py --vector 37
+```
+
+---
+
 ## Project Structure
 
 ```
@@ -157,6 +213,8 @@ esp32/
 │   ├── test_ble_dewhiten.cpp                # Dewhitening round-trip tests
 │   └── test_rf_setup.cpp                    # RF_SETUP register tests
 ├── tools/                                    # Utility scripts
+│   ├── e2e_crossval_test.sh                # End-to-end BLE cross-validation
+│   ├── ble_diag_test.sh                    # Automated BLE diagnostic test
 │   └── ubertooth_btle_tx.py                 # Ubertooth BLE TX tool
 ├── docs/learning/                            # Learning documentation
 │   ├── INDEX.md                              # Learning doc index
@@ -237,6 +295,7 @@ Non-trivial design topics are documented separately in `docs/learning/`:
 | BLE packet crafting (raw ADV_NONCONN_IND) | [nrf24-ble-packet-crafting.md](docs/learning/nrf24-ble-packet-crafting.md) |
 | RF legal boundaries | [rf-legal-boundaries.md](docs/learning/rf-legal-boundaries.md) |
 | C++ enum class & struct patterns | [cpp-enum-class-and-struct.md](docs/learning/cpp-enum-class-and-struct.md) |
+| Changelog (bug fixes, design rationale) | [CHANGELOG.md](docs/learning/CHANGELOG.md) |
 
 Full index: [docs/learning/INDEX.md](docs/learning/INDEX.md)
 
