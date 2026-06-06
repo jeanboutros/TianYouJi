@@ -124,8 +124,10 @@ These rules apply whenever modelling hardware registers, peripherals, or protoco
 ### Typed enums for every field — no raw integers in the API
 
 - Every register field that has a finite set of legal values **must be an `enum class`**, not an `int` or `uint8_t` literal.
+- Every **method parameter** that accepts one of a finite set of values **must use a typed enum or a struct with `ADDRESS` constant**, not `uint8_t`. If a named-constant vocabulary exists for a parameter (e.g. `nrf24::reg::CONFIG` for register addresses), the parameter type must enforce it at compile time. Convenience `uint8_t` overloads **must be `private` or `protected`** — never `public`.
 - Enum enumerator names must come **verbatim from the datasheet symbol names** wherever possible (e.g. `RF_DR_LOW`, `RF_PWR`). Use CamelCase only when the datasheet uses all-caps abbreviations that would be unreadable as-is.
 - **No "catch-all" or "raw value" enumerators** (e.g. `Raw = 0xFF`). If the user needs a raw escape hatch, provide a separate `from_byte()` / `to_byte()` path on the struct, not inside the enum.
+- **Naming conventions (`nrf24::reg::CONFIG`) are NOT sufficient where type enforcement is possible.** A `uint8_t` parameter that accepts `nrf24::reg::CONFIG` also accepts `0xFF` (an invalid register address). The type system must reject invalid values at compile time.
 
 ### Library API design — give users a vocabulary, not a raw byte
 
@@ -144,10 +146,12 @@ nrf24_write_reg(REG_RF_SETUP, rf.to_byte());
 
 Rules:
 - Expose **one `enum class` per field**, with an enumerator for every value the datasheet defines.
-- Expose **one aggregate struct per register** with typed fields, `to_byte()`, and `from_byte()`.
+- Expose **one aggregate struct per register** with typed fields, `to_byte()`, `from_byte()`, and `format()`.
+- Expose **typed overloads on the driver class** that deduce the register address from the struct type (e.g. `radio.read_reg(Config{})` returns `Config`, `radio.write_reg(cfg)` deduces `Config::ADDRESS`). Raw `uint8_t` overloads must be `private` — accessible only via the typed wrapper or internally.
 - Expose **`to_reg(FieldType)` free functions** (overloaded per field type) so users can compose individual fields without constructing a full struct.
 - Keep internal helpers (bit-splitting, encoding tables) in a `detail` sub-namespace so they do not pollute the public API.
 - Headers are a library contract — **no learning notes, no TODO comments, no design rationale** in headers. That material belongs in `docs/learning/`.
+- **The typed API must be the ONLY public API** — if both raw and typed overloads exist, the raw overloads must be private or protected. The presence of typed overloads does not excuse making raw overloads public.
 
 ### Completeness — model the full register, nothing less
 
@@ -175,8 +179,9 @@ radio.write_reg(nrf24::reg::CONFIG, nrf24::Config().to_byte());
 
 Rules:
 - **`@param` docs** must reference the header that defines the legal values (e.g. "Use constants from `nrf24l01plus/registers/addresses.h`").
-- **`@code` examples** must use the library's typed constants — never magic numbers that the user would need to look up.
-- **If a function accepts `uint8_t` but a named-constant vocabulary exists**, the documentation must make this explicit so users discover the constants at the call site, not by accident.
+- **`@code` examples** must use the library's typed constants and struct forms — never magic numbers that the user would need to look up. Examples must show the typed overload first (`radio.write_reg(cfg)`) and only show the raw overload in a comment marked `// internal use`.
+- **If a function accepts `uint8_t` but a named-constant vocabulary exists**, this must be treated as a design deficiency, not merely documented. Either: (a) add a typed overload that deduces the address from a struct type, or (b) make the raw overload `private`. Documentation alone is not sufficient.
+- **Learning docs and code examples** in `docs/learning/` must use the library's typed vocabulary in all `@code` blocks and inline code. If a doc needs to show the low-level raw API (for educational purposes), it must prominently note: *"This shows the low-level SPI API for educational purposes. Production code should use the typed struct API — see [cpp-enum-class-and-struct.md]."*
 
 ## Knowledge Management Rules
 

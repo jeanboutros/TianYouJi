@@ -42,8 +42,11 @@ Before writing your verdict, complete this checklist **explicitly in your output
 - If not run in this session, state "NOT VERIFIED — requires build"
 
 ### Typed enums
-- Grep for `uint8_t` parameters that should be enum class
-- Check that no public function accepts raw integers for typed fields
+- Grep for `uint8_t` parameters in **public method signatures** that should be enum class or struct type
+- For every `public` method: if a parameter has a finite set of legal values (e.g. register addresses, field encodings), verify the parameter TYPE enforces this at compile time, not just through naming conventions
+- **`constexpr uint8_t` namespace constants (e.g. `nrf24::reg::CONFIG`)** are documentation aids, NOT type safety — if a `uint8_t` parameter accepts these constants, it also accepts `0xFF`
+- Check that raw `uint8_t` overloads are `private` or `protected` where typed alternatives exist
+- Cross-reference: does every `uint8_t` parameter in the public API have a corresponding typed overload?
 
 ### Doxygen
 - List every new public symbol (function, struct, enum, macro)
@@ -64,7 +67,9 @@ Before writing your verdict, complete this checklist **explicitly in your output
 
 ### No magic numbers
 - Scan `@code` blocks for hex literals like `0x03`, `0x26`
-- All values should use library vocabulary: `nrf24::DataRate::Mbps1`
+- All values should use library vocabulary: `nrf24::DataRate::Mbps1`, `nrf24::Config{...}.to_byte()`
+- **`@code` examples must show the typed overload first** (`radio.write_reg(cfg)`) — raw overloads only in comments marked `// internal use`
+- Check learning docs (`docs/learning/`) for the same pattern — raw hex in learning docs must have a prominent note directing readers to the typed API
 
 ### Buffer safety
 - All `memcpy`, array access, SPI transfers have bounded size

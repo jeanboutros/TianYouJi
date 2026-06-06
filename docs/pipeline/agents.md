@@ -40,13 +40,15 @@ The Dual-Model Challenge is used in both phases for adversarial review.
 - Specify namespace structure and type hierarchies
 - Ensure no platform coupling in library headers
 - Define acceptance criteria for software architecture
+- **API Surface Audit:** list every public method signature and verify that each parameter type is maximally restrictive — no `uint8_t` where a typed enum/struct vocabulary exists
 
 **Phase C verification checklist:**
 - [ ] Library has zero platform includes in public headers
 - [ ] HAL interface sufficient for all driver operations
 - [ ] Namespace hierarchy clean (nrf24::, nrf24::ble::, nrf24::diag::)
 - [ ] `enum class` used for every field with finite legal values
-- [ ] No raw integers in public API
+- [ ] **Typed API surface:** for every `public` method, check each parameter: if a named-constant vocabulary exists for this parameter (e.g. `nrf24::reg::` for addresses, `enum class` for field values), is the parameter TYPE using it? Raw `uint8_t` overloads must be `private` — never `public`.
+- [ ] No raw integers in public API — verify not just register fields, but also method parameters
 - [ ] SOLID principles followed
 - [ ] Component CMakeLists.txt dependencies correct
 
