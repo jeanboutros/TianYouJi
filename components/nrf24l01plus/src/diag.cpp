@@ -104,12 +104,13 @@ bool spi_comm_test(Driver &radio)
         if (!pass) all_pass = false;
     }
 
-    /* RF_CH — POR value 0x00 (channel 0 = 2400 MHz); bit 7 is reserved */
+    /* RF_CH — POR value 0x02 per datasheet Table 28; bit 7 is reserved */
     {
         auto actual = radio.read_reg(RfCh{});
-        bool pass = (actual.to_byte() & REG_MASK_RF_CH) == 0x00;
-        printf("  RF_CH      exp=0x00  got=0x%02X  [%s]\n",
-               actual.to_byte() & REG_MASK_RF_CH, pass ? "PASS" : "FAIL");
+        bool pass = (actual.to_byte() & REG_MASK_RF_CH) == (RfCh::RESET_VALUE & REG_MASK_RF_CH);
+        printf("  RF_CH      exp=0x%02X  got=0x%02X  [%s]\n",
+                RfCh::RESET_VALUE & REG_MASK_RF_CH,
+                actual.to_byte() & REG_MASK_RF_CH, pass ? "PASS" : "FAIL");
         if (!pass) all_pass = false;
     }
 
