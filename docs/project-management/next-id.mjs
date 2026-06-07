@@ -22,7 +22,7 @@
  *   { "kind": "ticket", "ids": ["nrf-0016"], "dryRun": false }
  */
 
-import { readFileSync, writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -37,6 +37,16 @@ const KIND_CONFIG = {
     advisory:      { key: "lastAdvisory",        prefix: "nrf-adv",     width: 4 },
     design:        { key: "lastDesign",          prefix: "nrf-design",  width: 4 },
     chore:         { key: "lastChore",           prefix: "nrf-chore",   width: 4 },
+};
+
+const DEFAULT_COUNTERS = {
+    lastTicket: 0,
+    lastEpic: 0,
+    lastClarification: 0,
+    lastAdr: 0,
+    lastAdvisory: 0,
+    lastDesign: 0,
+    lastChore: 0,
 };
 
 // ── Argument parsing ────────────────────────────────────────────────
@@ -66,7 +76,13 @@ function parseArgs(argv) {
 // ── Counter I/O ─────────────────────────────────────────────────────
 
 function loadCounters() {
-    return JSON.parse(readFileSync(COUNTERS_PATH, "utf-8"));
+    if (!existsSync(COUNTERS_PATH)) {
+        saveCounters(DEFAULT_COUNTERS);
+        return { ...DEFAULT_COUNTERS };
+    }
+    const stored = JSON.parse(readFileSync(COUNTERS_PATH, "utf-8"));
+    // Merge with defaults so new keys are added automatically
+    return { ...DEFAULT_COUNTERS, ...stored };
 }
 
 function saveCounters(counters) {
