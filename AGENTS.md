@@ -1,270 +1,95 @@
-# ESP32 Development Agent Notes
+# ESP32 nRF24L01+ Project — Agent Configuration
 
-> **Important:** After managing a new challenge in a conversation, update this AGENTS.md file with the solution.
+## Tech Stack
 
-## Multi-Agent Validation Pipeline (MANDATORY)
+| Component | Skill to Load |
+|-----------|---------------|
+| nRF24L01+ radio | `nrf24l01plus` |
+| ESP-IDF / ESP32 | `esp-idf` |
+| BLE protocol | `ble-protocol` |
+| C++ embedded patterns | `cpp-embedded` |
+| Memory safety | `memory-safety` |
+| Ubertooth testing | `ubertooth` |
+| nRF52840 sniffer | `nrf52840-sniffer` |
 
-This project uses a 3-phase validation pipeline for all non-trivial changes.
+## Skill Loading Protocol
 
-### Documentation & Configuration
+All agents follow this initialisation sequence:
 
-| Resource | Location |
-|----------|----------|
+1. **Assumption trap** — load `assumption-trap` FIRST before any analysis
+2. **Domain skills** — load skills from the Tech Stack table relevant to the task
+3. **Pipeline skill** — load `pipeline` when working with gates or phase transitions
+4. **Process skills** — load `pau-loop`, `incremental-execution`, `test-driven-development`, or `systematic-debugging` as the task requires
+5. **Review skills** — load `self-audit-checklist` before any Phase C verdict; load `datasheet-verification` before confirming any register value
+
+## Skill Registry
+
+| Skill | Trigger Condition |
+|-------|-------------------|
+| `assumption-trap` | First skill loaded in any session — halt on ambiguity |
+| `pau-loop` | Plan-Apply-Validate cycle for implementation tasks |
+| `incremental-execution` | Build-validate-next unit protocol |
+| `test-driven-development` | Red-green-refactor with static_assert |
+| `systematic-debugging` | Root-cause before fix — no random edits |
+| `verification-before-completion` | No claims without fresh build evidence |
+| `brainstorming` | Structured design dialogue before code — hard gate |
+| `grill-me` | Adversarial review (Dual-Model Challenge) |
+| `self-audit-checklist` | 10-point quality checklist before verdicts |
+| `flag-protocol` | Raise issues for PM attention |
+| `datasheet-verification` | Verify hardware claims against datasheets |
+| `pipeline` | Pipeline phases, gates, compliance tiers, agent roles |
+| `compliance-gate` | T1/T2/T3 gate checks and retry budgets |
+| `nrf24l01plus` | nRF24L01+ chip traps, diagnostics, register order |
+| `esp-idf` | ESP-IDF build, FreeRTOS, SPI, GPIO, monitor, VS Code |
+| `cpp-embedded` | Typed enums, register structs, Doxygen, HAL, platform independence |
+| `ble-protocol` | BLE advertising, PDU types, whitening, bit order, CRC-24 |
+| `memory-safety` | RAII, buffer safety, ASAN, heap/stack analysis |
+| `ubertooth` | Ubertooth One BLE TX/RX, firmware, dewhitening |
+| `nrf52840-sniffer` | Nordic dongle BLE capture, Wireshark extcap |
+| `review-confidence` | Confidence scoring for design reviews |
+| `silent-failure` | Detecting silent hardware/software failures |
+| `type-design-review` | Reviewing enum/struct API design quality |
+
+## Pipeline Summary
+
+```
+Phase A ──▶ A-GATE (T3) ──▶ Phase B ──▶ B-UNIT-GATE (T1)×N ──▶ B-FINAL-GATE (T1+T2) ──▶ Phase C ──▶ C-GATE (T1+T3) ──▶ COMMIT
+```
+
+T1 = Mechanical (build, Doxygen, banned patterns) · T2 = Architectural (library boundary, namespaces, typed API) · T3 = Semantic (datasheet, protocol, security)
+
+See `pipeline` skill for full definitions, agent roles, and gate retry rules.
+
+## Agent Principles
+
+1. **No assumptions** — Halt on ambiguity; never guess register values, bit layouts, or protocol details. Load `assumption-trap`.
+2. **Datasheet is truth** — Verify all hardware claims against `docs/datasheets/`. If unclear, check the web. If still unclear, halt.
+3. **PAU loop** — Plan units → Apply one at a time → Validate with `idf.py build`. Never implement everything at once.
+4. **Quality gates** — Build must pass with zero warnings (`-Werror` active). Run `t1-check.sh` between units and at gates.
+5. **Typed API only** — No raw integers in the public API. Every finite-value field is an `enum class`. See `cpp-embedded` skill.
+6. **Platform independence** — Library public headers include only `<cstdint>`, `<cstring>`, and own headers. All hardware access through the `Hal` interface. See `cpp-embedded` skill.
+7. **Self-reflection** — After any bug fix, ask: why was it missed? What safeguard would catch it? Update the skill or learning doc.
+8. **Incremental with evidence** — One logical unit → build → pass → next unit. Never skip validation. Load `verification-before-completion`.
+
+## Project Details
+
+| Item | Value |
+|------|-------|
+| ESP-IDF path | `~/.espressif/v6.0.1/esp-idf/` |
+| Build / verify | `source ~/.espressif/tools/activate_idf_v6.0.1.sh && idf.py build` |
+| T1 check | `bash docs/pipeline/scripts/t1-check.sh` |
+| Flash | `idf.py -p /dev/ttyUSB0 flash monitor` |
+| Serial port | `/dev/ttyUSB0` (verify with `ls /dev/ttyUSB*`) |
+| CE pin | GPIO4 (was GPIO5 — migrated to avoid SPI3 IO_MUX overlap; see `nrf24l01plus` skill §1.3) |
 | Pipeline spec | `docs/pipeline/pipeline.md` |
-| Agent roles (detailed) | `docs/pipeline/agents.md` |
-| OpenCode agents | `.opencode/agents/` |
-| OpenCode skills | `.opencode/skills/` |
+| Agent roles | `docs/pipeline/agents.md` |
 | Task tracker | `docs/pipeline/TODO.md` |
 
-### OpenCode Agents
-
-| Agent | Role | Phases |
-|-------|------|--------|
-| `agency-director` | Orchestrator — dispatch only, never executes | All |
-| `software-engineer` | Architecture, API, component boundaries | A, C |
-| `hardware-engineer` | Register models, datasheet fidelity, timing | A, C |
-| `wireless-expert` | RF protocol, BLE spec, channel/frequency mapping | A, C |
-| `security-reviewer` | Buffer safety, stack depth, secrets, DMA bounds | A, C |
-| `test-engineer` | Test strategy, static_assert, host-side unit tests | A, B, C |
-| `docs-writer` | Doxygen, learning docs, reference verification | A, C |
-| `code-architect` | Implementation via PAU loop | B |
-| `memory-safety` | C++ memory leak detection, RAII, heap/stack safety | A, C |
-| `pm` | Task creation, flag processing (sole authority) | All |
-
-### OpenCode Skills
-
-| Skill | Purpose | Used by |
-|-------|---------|---------|
-| `assumption-trap` | HALT on ambiguity — never guess | All agents |
-| `pau-loop` | Plan-Apply-Validate cycle | Code Architect, Test Engineer |
-| `incremental-execution` | Unit-by-unit with build validation | Code Architect, Test Engineer |
-| `datasheet-verification` | Verify hardware against datasheets | HW Engineer, Wireless Expert, Code Architect |
-| `self-audit-checklist` | 10-point quality checklist for reviews | All reviewing agents |
-| `flag-protocol` | Raise issues for PM attention | All non-PM agents |
-| `systematic-debugging` | Root-cause before fix — no random edits | Code Architect |
-| `test-driven-development` | Red-green-refactor with static_assert | Test Engineer |
-| `verification-before-completion` | No claims without fresh build evidence | All agents |
-| `brainstorming` | Structured design before code — hard gate | All (Phase A) |
-| `grill-me` | Adversarial review (Dual-Model Challenge) | Phase A & C |
-| `nrf24l01plus` | nRF24L01+ chip-specific traps and diagnostics | All agents touching nRF24 code |
-| `memory-safety` | C++ memory leak, RAII, ASAN, heap/stack safety | All agents |
-| `ubertooth` | Ubertooth One BLE testing and cross-validation (TX/RX, firmware update, dewhitening validation) | All agents using Ubertooth or cross-validation |
-| `nrf52840-sniffer` | Nordic nRF52840 Dongle BLE sniffer for cross-validation (Wireshark extcap, PDU comparison) | All agents using nRF Sniffer or cross-validation |
-| `esp-idf` | ESP-IDF framework, FreeRTOS, SPI bus, GPIO modes, build system, monitor control, VS Code diagnostics | All agents working with ESP-IDF APIs or ESP32 hardware |
-| `cpp-embedded` | C++ patterns for embedded libraries — typed enums, register structs, Doxygen, HAL interfaces, platform independence | Code Architect, Software Engineer, HW Engineer, Test Engineer |
-| `ble-protocol` | BLE protocol details — advertising channels, PDU types, data whitening, bit order, access addresses, CRC-24 | All agents working with BLE sniffing, transmission, or protocol code |
-
-### Pipeline Summary
-
-```
-Phase A ──▶ A-GATE (T3) ──▶ Phase B ──▶ B-UNIT-GATE (T1) ×N ──▶ B-FINAL-GATE (T1+T2) ──▶ Phase C ──▶ C-GATE (T1+T3) ──▶ COMMIT
-```
-
-Each gate has independent 3-retry counters per tier.
-Gates enforce three compliance tiers:
-  T1 (Mechanical): build, Doxygen, banned patterns, file placement, reserved bits
-  T2 (Architectural): library boundary, namespaces, typed API, no globals
-  T3 (Semantic): datasheet fidelity, protocol correctness, security, coverage
-
-See `docs/pipeline/pipeline.md` for full gate definitions and `docs/pipeline/scripts/t1-check.sh` for automated T1 checks.
-
-### Key Rules
-
-1. **No-Assumption Protocol** — When encountering ambiguity about hardware, protocol, or design, HALT with `STATUS: BLOCKED` and ask. Never guess register values or bit layouts.
-2. **PAU Loop** — Plan the units → Apply one unit at a time → Validate (`idf.py build`) after each. Never implement everything at once.
-3. **Datasheet is source of truth** — Verify all hardware details against `docs/datasheets/` before coding. If unclear, check the web. If still unclear, HALT.
-4. **Quality Gate** — Before committing: build passes, Doxygen present, typed enums used, no magic numbers, AGENTS.md rules followed.
-5. **Incremental execution** — One logical unit → build → pass → next unit. Never skip validation.
-6. **Flag Protocol** — Non-blocking issues raised as structured flags for the PM to process.
-7. **Compliance Gates** — Every phase transition passes through a gate with tiered checks:
-   - B-UNIT-GATE (T1): after every implementation unit, run `scripts/t1-check.sh`
-   - B-FINAL-GATE (T1+T2): after all units, run T1 + Software Engineer spot-check
-   - C-GATE (T1+T3): before commit, re-run T1 + all 6 specialists approve
-   - Independent 3-retry budget per tier per gate; escalate to user if exhausted
-   - Self-reflection on violations: why was it missed? What safeguard prevents recurrence?
-
-### Validation Command
-
-```bash
-source ~/.espressif/tools/activate_idf_v6.0.1.sh && idf.py build
-```
-
-Must exit 0 with zero warnings (`-Werror` is active) before any commit.
-
-```bash
-# T1 Mechanical Compliance Check (run between PAU units and at gates):
-bash docs/pipeline/scripts/t1-check.sh
-```
-
-## Compliance Tiers
-
-| Tier | Name | Enforced at | What | How | Who |
-|------|------|-------------|------|-----|-----|
-| T1 | Mechanical | B-UNIT-GATE, B-FINAL-GATE, C-GATE | Build, Doxygen, banned patterns, file placement, raw integers, magic numbers | `scripts/t1-check.sh` + build | Code Architect runs, Director orchestrates |
-| T2 | Architectural | B-FINAL-GATE | Library boundary, namespaces, typed API, file placement, no globals | Delta review | Software Engineer |
-| T3 | Semantic | A-GATE, C-GATE | Datasheet, protocol, security, coverage, docs | Full specialist review | All 6 specialists |
-
-## Code Documentation Rules (MANDATORY)
-
-### Doxygen-style comments for all new symbols
-
-Every new **function**, **struct**, **class**, **enum**, or **macro group** must be preceded by a Doxygen `/** ... */` block. Use the following structure:
-
-```c
-/**
- * @brief One-sentence summary of what this does.
- *
- * Longer explanation if needed — describe the protocol, bit layout,
- * algorithm, or non-obvious design decision here.
- *
- * Use @code / @endcode blocks for:
- *   - Bit/byte layout diagrams
- *   - Arithmetic walkthroughs
- *   - Usage examples
- *
- * @code
- *   // Example: show inputs, intermediate steps, and result
- *   foo(REG_STATUS);   // 0x07 & 0x1F = 0x07 → cmd = 0x07
- * @endcode
- *
- * @param name   Description (include units, valid range, or bit meaning).
- * @return       What is returned and under what conditions.
- */
-```
-
-### Rules
-
-- **`@brief`** — always present; one sentence, no period at end.
-- **`@code`** — use for any non-obvious bit manipulation, protocol encoding, or illustrative call site. Include an edge-case example (e.g. `0xFF` input) when the masking/clamping behaviour matters.
-- **`@param`** — one line per parameter; note which bits are used if the full width is not consumed.
-- **`@return`** — always present for non-void functions.
-- Comments inside the function body remain as `/* short inline notes */` — do **not** duplicate the Doxygen block content there.
-- This style applies to C and C++ equally.
-
-## Hardware Register Library Design Principles (MANDATORY)
-
-These rules apply whenever modelling hardware registers, peripherals, or protocol fields in C/C++ libraries.
-
-### Datasheet is the source of truth — no assumptions, no invention
-
-- **Read the datasheet first.** Every field name, bit position, encoding, and default value must come from the datasheet, not from intuition, training data, or prior experience with similar chips.
-- **Never invent a value or field.** If a bit's meaning is not described in the datasheet, leave it unnamed (e.g. `reserved`) — do not guess.
-- **If something is unclear in the datasheet, check the web** (application notes, errata, community reports) before writing any code. Use `fetch_webpage` on official sources.
-- **If it is not in the datasheet and not on the web, do not make it up.** Stop, ask the user for clarification, or mark the field explicitly as `/* unknown — not documented */`.
-
-### Typed enums for every field — no raw integers in the API
-
-- Every register field that has a finite set of legal values **must be an `enum class`**, not an `int` or `uint8_t` literal.
-- Every **method parameter** that accepts one of a finite set of values **must use a typed enum or a struct with `ADDRESS` constant**, not `uint8_t`. If a named-constant vocabulary exists for a parameter (e.g. `nrf24::reg::CONFIG` for register addresses), the parameter type must enforce it at compile time. Convenience `uint8_t` overloads **must be `private` or `protected`** — never `public`.
-- Enum enumerator names must come **verbatim from the datasheet symbol names** wherever possible (e.g. `RF_DR_LOW`, `RF_PWR`). Use CamelCase only when the datasheet uses all-caps abbreviations that would be unreadable as-is.
-- **No "catch-all" or "raw value" enumerators** (e.g. `Raw = 0xFF`). If the user needs a raw escape hatch, provide a separate `from_byte()` / `to_byte()` path on the struct, not inside the enum.
-- **Naming conventions (`nrf24::reg::CONFIG`) are NOT sufficient where type enforcement is possible.** A `uint8_t` parameter that accepts `nrf24::reg::CONFIG` also accepts `0xFF` (an invalid register address). The type system must reject invalid values at compile time.
-
-### Library API design — give users a vocabulary, not a raw byte
-
-The goal is that a user calling the library can **read and understand the intent** of their code without looking at the datasheet:
-
-```cpp
-// BAD — opaque, error-prone, requires the user to memorise bit positions
-nrf24_write_reg(REG_RF_SETUP, 0x26);
-
-// GOOD — self-documenting, impossible to put a field in the wrong position
-nrf24::RfSetup rf;
-rf.data_rate = nrf24::DataRate::Mbps1;
-rf.tx_power  = nrf24::TxPower::dBm0;
-nrf24_write_reg(REG_RF_SETUP, rf.to_byte());
-```
-
-Rules:
-- Expose **one `enum class` per field**, with an enumerator for every value the datasheet defines.
-- Expose **one aggregate struct per register** with typed fields, `to_byte()`, `from_byte()`, and `format()`.
-- Expose **typed overloads on the driver class** that deduce the register address from the struct type (e.g. `radio.read_reg(Config{})` returns `Config`, `radio.write_reg(cfg)` deduces `Config::ADDRESS`). Raw `uint8_t` overloads must be `private` — accessible only via the typed wrapper or internally.
-- Expose **`to_reg(FieldType)` free functions** (overloaded per field type) so users can compose individual fields without constructing a full struct.
-- Keep internal helpers (bit-splitting, encoding tables) in a `detail` sub-namespace so they do not pollute the public API.
-- Headers are a library contract — **no learning notes, no TODO comments, no design rationale** in headers. That material belongs in `docs/learning/`.
-- **The typed API must be the ONLY public API** — if both raw and typed overloads exist, the raw overloads must be private or protected. The presence of typed overloads does not excuse making raw overloads public.
-
-### Completeness — model the full register, nothing less
-
-- Every bit in a register must be accounted for, even reserved bits.
-- Reserved bits are represented as unnamed padding or a note in the Doxygen block — **never silently ignored** in `to_byte()` or `from_byte()`.
-- If a multi-bit field has a non-contiguous encoding (e.g. nRF24 `DataRate` spans bits 5 and 3), the encoding logic **must follow the datasheet's table exactly** — use a helper in `detail::` rather than inventing a compact representation.
-
-### Platform independence — libraries must not couple to a specific SDK
-
-- **No platform headers in library public API.** A reusable library (e.g. a peripheral driver) must not `#include` platform-specific headers (ESP-IDF, STM32 HAL, Arduino, etc.) in any public header under `include/`.
-- **Abstract hardware access through a HAL interface.** Define a pure-virtual `Hal` class in the library. Platform-specific implementations live **outside** the library (e.g. in `main/` or a platform adapter component).
-- **Library source files must only include library headers and standard C/C++ headers.**
-
-### Dogfood your own vocabulary — no raw integers in examples or docs
-
-When the library defines named constants or typed enums, **all documentation, `@code` examples, and internal usage must use them**:
-
-```cpp
-// BAD — raw hex in an @code block, even though nrf24::reg::CONFIG exists
-radio.write_reg(0x00, 0x03);
-
-// GOOD — uses the library's own vocabulary
-radio.write_reg(nrf24::reg::CONFIG, nrf24::Config().to_byte());
-```
-
-Rules:
-- **`@param` docs** must reference the header that defines the legal values (e.g. "Use constants from `nrf24l01plus/registers/addresses.h`").
-- **`@code` examples** must use the library's typed constants and struct forms — never magic numbers that the user would need to look up. Examples must show the typed overload first (`radio.write_reg(cfg)`) and only show the raw overload in a comment marked `// internal use`.
-- **If a function accepts `uint8_t` but a named-constant vocabulary exists**, this must be treated as a design deficiency, not merely documented. Either: (a) add a typed overload that deduces the address from a struct type, or (b) make the raw overload `private`. Documentation alone is not sufficient.
-- **Learning docs and code examples** in `docs/learning/` must use the library's typed vocabulary in all `@code` blocks and inline code. If a doc needs to show the low-level raw API (for educational purposes), it must prominently note: *"This shows the low-level SPI API for educational purposes. Production code should use the typed struct API — see [cpp-enum-class-and-struct.md]."*
-
-## Knowledge Management Rules
-
-### Learning Summaries
-
-After every conversation where something non-trivial is learned or solved:
-
-1. **Create or update a learning document** in `docs/learning/` as a Markdown file.
-   - File name: kebab-case reflecting the topic, e.g. `freertos-task-pinning.md`
-   - Sections: **What was learned**, **Code examples**, **Pitfalls**, **References**
-2. **Update `docs/learning/INDEX.md`** — add or update the entry for the relevant theme. Group entries by theme (e.g. *FreeRTOS*, *ESP-IDF Setup*, *C/C++ Basics*).
-3. All learning files must be **Markdown only**.
-
-### Follow-up Questions and Clarifications (MANDATORY)
-
-Whenever a follow-up question or clarification is asked about a topic that already has a learning document:
-
-1. **Add the answer directly into the relevant existing doc** — do not just reply in chat and move on.
-2. Place the new content in the most logical section, or add a new section if needed.
-3. Then commit the updated doc.
-
-> Rationale: the docs are the source of truth. A clarification that lives only in chat history is lost.
-
-### Reference Policy (MANDATORY)
-
-- **Never rely solely on training data** for factual claims about APIs, versions, behaviour, or hardware specs.
-- **Always verify with online references** before including them:
-  - Use the `fetch_webpage` tool to check that a URL returns valid content before linking it.
-  - If the page is unreachable or returns an error, do not include the link.
-  - Prefer official documentation: [Espressif docs](https://docs.espressif.com), [FreeRTOS docs](https://www.freertos.org/Documentation/RTOS_book.html), [cppreference](https://en.cppreference.com).
-- Each learning file should include a **References** section with at least one verified external link.
-
-### `docs/learning/INDEX.md` Format
-
-```markdown
-# Learning Index
-
-## FreeRTOS
-- [Task pinning to a core](freertos-task-pinning.md)
-
-## ESP-IDF Setup
-- [Environment variables and IDF_PYTHON_ENV_PATH](idf-env-setup.md)
-
-## C/C++ Basics
-- [Entry point: app_main vs main](esp32-entry-point.md)
-```
-
-## Git Commit Rules (MANDATORY)
+## Git Commit Rules
 
 ### Commit after every completed task
 
-After completing any task — code change, doc update, config edit — always commit the result before moving on.
+After completing any task — code change, doc update, config edit — always commit before moving on.
 
 ### Use Conventional Commits format
 
@@ -274,203 +99,32 @@ After completing any task — code change, doc update, config edit — always co
 <body — what changed and why, bullet points if multiple items>
 ```
 
-**Common types:**
-
 | Type | Use for |
 |------|---------|
-| `feat` | New feature or capability added to code |
+| `feat` | New feature or capability |
 | `fix` | Bug fix |
-| `docs` | Documentation changes only (`docs/learning/`, `README.md`, `AGENTS.md`) |
-| `chore` | Tooling, config, build system changes |
+| `docs` | Documentation only (`docs/learning/`, `README.md`, `AGENTS.md`) |
+| `chore` | Tooling, config, build system |
 | `refactor` | Code restructured without behaviour change |
 | `style` | Formatting only (no logic change) |
 
-**Scope** is the area affected, e.g. `main`, `freertos`, `idf-setup`, `agents`.
-
 ### Group commits by concern — never bundle unrelated changes
 
-Each commit must contain **only related changes**. Split into separate commits when changes span unrelated areas:
-
-```
-# WRONG — one big commit mixing code and docs
-git commit -m "add task pinning and update docs and fix monitor note"
-
-# CORRECT — separate commits
-git commit -m "feat(main): add xTaskCreatePinnedToCore example on core 1"
-git commit -m "docs(learning): add freertos-task-pinning learning file"
-git commit -m "docs(agents): add knowledge management and commit rules"
-```
+Each commit must contain **only related changes**. Split into separate commits when changes span unrelated areas.
 
 ### Commit body guidelines
 
-- Use the body to explain **what** changed and **why**, not just how.
+- Explain **what** changed and **why**, not just how.
 - Use bullet points for multiple related changes within the same scope.
-- Reference the source of truth when relevant (e.g. ESP-IDF docs URL).
+- Reference the source of truth when relevant (e.g. datasheet page, ESP-IDF docs URL).
+- Verify URLs before linking — never rely on training data for factual claims.
 
-### Example commit
+### Example
 
 ```
 docs(learning): add FreeRTOS task pinning guide
 
 - Add docs/learning/freertos-task-pinning.md covering xTaskCreatePinnedToCore
-- Add docs/learning/esp32-app-main-basics.md covering mandatory firmware structure
+- Add docs/learning/esp32-app-main-basics.md covering firmware structure
 - Update docs/learning/INDEX.md with new entries under FreeRTOS and ESP-IDF Basics
-
-References verified against:
-https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/system/freertos_idf.html
 ```
-
-## ESP-IDF Monitor Control
-
-### Exiting Monitor Mode
-
-When running `idf.py monitor`, use these shortcuts:
-
-| Shortcut | Action |
-|----------|--------|
-| `Ctrl`+`]` | Exit monitor (standard) |
-| `Ctrl`+`T` then `X` | Alternative exit |
-| `Ctrl`+`A` then `K` | If using `screen` backend |
-
-> **Note:** `Ctrl+C` does NOT exit ESP-IDF monitor - it only interrupts the running app.
-
-## Finding ESP32 Serial Port
-
-When flashing ESP32, first detect the correct `/dev/ttyUSB*` or `/dev/ttyACM*` device path:
-
-### Quick Detection
-```bash
-# List USB serial devices
-ls /dev/ttyUSB* /dev/ttyACM* 2>/dev/null
-
-# Check USB devices (look for ESP32 bridge chips)
-lsusb
-# Common chips: "Silicon Labs CP210x", "QinHeng CH340", "FTDI"
-
-# Watch kernel messages when plugging/unplugging
-sudo dmesg -w
-```
-
-### Before/After Comparison
-```bash
-# Run before plugging in ESP32
-ls /dev/tty* > /tmp/before.txt
-
-# Plug in ESP32, then run
-ls /dev/tty* > /tmp/after.txt
-
-# Compare to find the new device
-diff /tmp/before.txt /tmp/after.txt
-```
-
-### Fixing Permission Issues
-
-If you get "not readable" error:
-
-```bash
-# Option 1: Add user to dialout group (permanent, requires logout)
-sudo usermod -a -G dialout $USER
-
-# Option 2: Quick fix (temporary, resets on unplug)
-sudo chmod 666 /dev/ttyUSB0
-```
-
-### Setting up ESP-IDF Environment
-
-```bash
-# Step 1: Activate ESP-IDF Python environment (ALWAYS do this first in any session)
-source ~/.espressif/tools/activate_idf_v6.0.1.sh
-
-# Step 2: Then flash
-idf.py -p /dev/ttyUSB0 flash monitor
-```
-
-## Project Structure
-
-- This project uses ESP-IDF framework
-- ESP-IDF located at: `~/.espressif/v6.0.1/esp-idf/`
-
-## VS Code Diagnostics
-
-If VS Code shows errors such as `cannot open source file "freertos/FreeRTOS.h"`, verify workspace settings in `.vscode/settings.json` include:
-
-- `C_Cpp.default.configurationProvider`: `espressif.esp-idf-extension`
-- `C_Cpp.default.compileCommands`: `${workspaceFolder}/build/compile_commands.json`
-- `C_Cpp.default.compilerPath`: Xtensa toolchain GCC path (for ESP32 target)
-- `idf.port`: serial device path such as `/dev/ttyUSB0`
-- `idf.flashType`: `UART`
-
-Notes:
-
-- `build/compile_commands.json` contains ESP-IDF include paths (including FreeRTOS headers).
-- If paths are still unresolved, run `C/C++: Reset IntelliSense Database` and reload the VS Code window.
-
-### "Setup from environment variables is not valid: IDF_PYTHON_ENV_PATH is not set"
-
-Cause: the EIM-installed activate script (`~/.espressif/tools/activate_idf_v<ver>.sh`) does NOT export `IDF_PYTHON_ENV_PATH` or `IDF_TOOLS_PATH`, and the ESP-IDF extension's `idf.currentSetup` must match a key under `idfInstalled` in `~/.espressif/idf-env.json` (e.g. `/home/huyang/.espressif/v6.0.1/esp-idf-v6.0`, NOT just `.../esp-idf`). When the key does not match, the extension falls back to env-var setup, which then fails.
-
-Fix in `.vscode/settings.json`:
-
-```jsonc
-"idf.currentSetup": "/home/huyang/.espressif/v6.0.1/esp-idf-v6.0", // exact key from idf-env.json
-"idf.customExtraVars": {
-  "IDF_PATH": "/home/huyang/.espressif/v6.0.1/esp-idf",
-  "IDF_TOOLS_PATH": "/home/huyang/.espressif",
-  "IDF_PYTHON_ENV_PATH": "/home/huyang/.espressif/tools/python/v<ver>/venv",
-  "ESP_IDF_VERSION": "6.0.1"
-}
-```
-
-Verify the exact `idfInstalled` key:
-
-```bash
-python3 -c "import json; print(list(json.load(open('$HOME/.espressif/idf-env.json'))['idfInstalled']))"
-```
-
-For a CLI shell (when launching `idf.py` outside the activate script), also export:
-
-```bash
-export IDF_TOOLS_PATH=$HOME/.espressif
-export IDF_PYTHON_ENV_PATH=$HOME/.espressif/tools/python/v6.0.1/venv
-```
-
-## nRF24L01+ Chip-Specific Traps
-
-> **Full details, symptom tables, and code examples are in the `nrf24l01plus` skill.**
-> Load the skill before touching any nRF24L01+ code: `.opencode/skills/nrf24l01plus/SKILL.md`
-
-### Critical rules (summary)
-
-1. **Register write order**: Write `EN_AA=0x00` **before** `CONFIG` (EN_CRC=0). If EN_AA is non-zero when CONFIG is written, the hardware forces EN_CRC=1 internally, silently rejecting every BLE packet. See skill §1.1 and `docs/learning/nrf24-enaa-encrc-override.md`.
-
-2. **SPI address byte order**: Multi-byte address registers (RX_ADDR_Pn, TX_ADDR) use **LSByte-first** SPI order (datasheet §8.3.1), which is the **opposite** of on-air byte order. Diagnostic readback of a wrong byte sequence passes — self-consistent errors are invisible. See skill §1.2 and `docs/learning/nrf24-spi-address-byte-order.md`.
-
-3. **CE GPIO mode**: Use `GPIO_MODE_INPUT_OUTPUT` (not `GPIO_MODE_OUTPUT`). Output-only pins disable the input buffer; `gpio_get_level()` always returns 0. See skill §1.3.
-
-4. **MOSI pin direction**: Never set SPI pins to `GPIO_MODE_INPUT` after `spi_bus_initialize()`. This silently breaks all SPI writes while reads appear to work. See skill §1.4.
-
-5. **GPIO5 overlap (RESOLVED)**: CE was migrated from GPIO5 to GPIO4 to avoid SPI3_HOST IO_MUX CS0 overlap. Do NOT move CE back to GPIO5. See skill §1.3.
-
-6. **Clone chips**: Si24R1/BK2425 clones may not follow CRC forcing rules. Use `spi_comm_test()` Stage 3 to detect. See skill §1.5.
-
-### Self-reflection clause
-
-After fixing any nRF24L01+ bug, you MUST ask:
-- Why was this bug missed?
-- What procedural safeguard would have caught it?
-- Update the skill or the relevant learning doc with the lesson.
-
-### Structured diagnostics module
-
-The project now uses `nrf24::diag::full_boot_diagnostic()` (in `diag_boot.h`) instead of the old boolean `spi_comm_test()` + `verify_ble_rx()` sequence. The structured module provides:
-
-- **6 phased checks**: HalInit → SpiComm → BleConfig → CeState → WarmBoot → ExtendedTest
-- **Typed results**: `DiagResult` per phase (pass/fail/skip + detail message), `DiagFullResult` aggregate
-- **Configurable retries**: `DiagOpts::max_retries` (default 3), `DiagOpts::verbose` for detailed output
-- **7 hardware verification criteria PASS**: power-on delay, independent address verification, EN_AA/EN_CRC write order, CE GPIO readback, warm boot handling, clone detection, self-consistent error detection
-
-The old `verify_spi_comm()` and `verify_ble_rx()` functions are still available as backward-compatible wrappers but are marked `@deprecated` in favor of `full_boot_diagnostic()`.
-
-### Hal::spi_xfer() returns bool
-
-`EspIdfHal::spi_xfer()` returns `false` on SPI errors instead of calling `abort()`. All `Driver` methods propagate the error: `read_reg(uint8_t)` returns `0xFF` on failure, `write_reg()`/`write_reg_multi()`/`read_reg_multi()`/`read_payload()`/`flush_rx()`/`flush_tx()` return `bool`. The typed template overloads (`read_reg<T>()`, `write_reg<T>()`) retain their original void/T return types for API stability. `EspIdfHal` has an RAII destructor that removes the SPI device and frees the bus.
