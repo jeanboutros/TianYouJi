@@ -28,6 +28,36 @@ bool Driver::read_reg_multi(uint8_t reg, uint8_t *buf, uint8_t len)
     return hal_.spi_xfer(cmd_r_register(reg), nullptr, buf, len);
 }
 
+bool Driver::write_payload(const uint8_t *data, uint8_t len)
+{
+    if (len > MAX_PAYLOAD) {
+        len = MAX_PAYLOAD;
+    }
+    return hal_.spi_xfer(cmd::W_TX_PAYLOAD, data, nullptr, len);
+}
+
+bool Driver::write_payload_noack(const uint8_t *data, uint8_t len)
+{
+    if (len > MAX_PAYLOAD) {
+        len = MAX_PAYLOAD;
+    }
+    return hal_.spi_xfer(cmd::W_TX_PAYLOAD_NOACK, data, nullptr, len);
+}
+
+bool Driver::reuse_tx_pl()
+{
+    return hal_.spi_xfer(cmd::REUSE_TX_PL, nullptr, nullptr, 0);
+}
+
+uint8_t Driver::read_payload_width()
+{
+    uint8_t width = 0;
+    if (!hal_.spi_xfer(cmd::R_RX_PL_WID, nullptr, &width, 1)) {
+        return 0xFF; /* SPI failure — MISO stuck high sentinel */
+    }
+    return width;
+}
+
 bool Driver::read_payload(uint8_t *buf, uint8_t len)
 {
     return hal_.spi_xfer(cmd::R_RX_PAYLOAD, nullptr, buf, len);

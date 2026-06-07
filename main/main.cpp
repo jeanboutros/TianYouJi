@@ -13,6 +13,7 @@
 #include "nrf24_espidf/hal_espidf.h"
 #include <nrf24l01plus/driver.h>
 #include <nrf24l01plus/diag_boot.h>
+#include <nrf24l01plus/register_tests.h>
 
 #include "ble_sniffer.h"
 
@@ -48,6 +49,14 @@ extern "C" void app_main(void)
         .spi_host = SPI3_HOST,
     });
     printf("NRF24L01 driver initialized\n");
+
+    /* Run register runtime tests (RfSetup non-constexpr round-trips).
+     * Static_asserts in static_asserts.cpp verify all constexpr paths
+     * at compile time. */
+    if (!nrf24::test::run_register_tests()) {
+        printf("Register runtime tests FAILED — halting\n");
+        return;
+    }
 
     /* Run structured boot diagnostics (SPI, BLE config, CE state, extended test).
      * If diagnostics fail after max retries, enter deep sleep for 60 seconds

@@ -75,6 +75,105 @@ public:
     bool read_reg_multi(uint8_t reg, uint8_t *buf, uint8_t len);
 
     /**
+     * @brief Write the TX payload into the TX FIFO.
+     *
+     * Sends the W_TX_PAYLOAD command (cmd::W_TX_PAYLOAD) followed by
+     * `len` bytes of payload data.  The payload is queued for transmission
+     * on the next CE pulse in TX mode.
+     *
+     * If `len` exceeds @ref MAX_PAYLOAD (32 bytes), it is clamped to
+     * @ref MAX_PAYLOAD.  Per the nRF24L01+ datasheet (§8.3.1), the
+     * payload length must be 1–32 bytes; a zero-length write is possible
+     * but produces an empty payload packet.
+     *
+     * @code
+     *   uint8_t packet[] = {0xAA, 0xBB, 0xCC};
+     *   radio.write_payload(packet, sizeof(packet));
+     * @endcode
+     *
+     * @param data  Pointer to payload bytes to transmit (must not be null
+     *              if len > 0).
+     * @param len   Number of payload bytes to write (clamped to
+     *              @ref MAX_PAYLOAD).
+     * @return      true if the SPI transfer succeeded, false on SPI failure.
+     */
+    bool write_payload(const uint8_t *data, uint8_t len);
+
+    /**
+     * @brief Write a TX payload without requesting auto-acknowledgement.
+     *
+     * Sends the W_TX_PAYLOAD_NOACK command (cmd::W_TX_PAYLOAD_NOACK)
+     * followed by `len` bytes.  The packet is transmitted without the
+     * auto-acknowledge handshake, even if auto-ack is enabled on the
+     * receiving pipe.  Requires EN_DYN_ACK (FEATURE register bit 0) to
+     * be enabled before use.
+     *
+     * If `len` exceeds @ref MAX_PAYLOAD (32 bytes), it is clamped to
+     * @ref MAX_PAYLOAD.
+     *
+     * @code
+     *   // Must enable dynamic ACK first:
+     *   auto feat = nrf24::Feature{};
+     *   feat.en_dyn_ack = nrf24::DynAckMode::Enabled;
+     *   radio.write_reg(feat);
+     *
+     *   uint8_t packet[] = {0x01, 0x02};
+     *   radio.write_payload_noack(packet, sizeof(packet));
+     * @endcode
+     *
+     * @param data  Pointer to payload bytes (must not be null if len > 0).
+     * @param len   Number of payload bytes to write (clamped to
+     *              @ref MAX_PAYLOAD).
+     * @return      true if the SPI transfer succeeded, false on SPI failure.
+     */
+    bool write_payload_noack(const uint8_t *data, uint8_t len);
+
+    /**
+     * @brief Re-use the last transmitted payload.
+     *
+     * Sends the REUSE_TX_PL command (cmd::REUSE_TX_PL).  The nRF24L01+
+     * retransmits the last TX payload that was written via write_payload().
+     * No new payload data is clocked — the command byte stands alone.
+     *
+     * Per the datasheet, this command must only be used in TX mode.
+     * A CE pulse is needed to start the actual retransmission.
+     *
+     * @code
+     *   radio.write_payload(data, len);  // First transmission
+     *   radio.ce_high();
+     *   // ... later, retransmit the same payload:
+     *   radio.reuse_tx_pl();
+     *   radio.ce_high();
+     * @endcode
+     *
+     * @return true if the SPI transfer succeeded, false on SPI failure.
+     */
+    bool reuse_tx_pl();
+
+    /**
+     * @brief Read the payload width of the top RX FIFO entry.
+     *
+     * Sends the R_RX_PL_WID command (cmd::R_RX_PL_WID) and reads one
+     * byte containing the payload length (1-32).  If the value read
+     * exceeds 32, the RX FIFO is likely corrupted (per datasheet §8.3.1),
+     * and the caller should flush the RX FIFO before reading further.
+     *
+     * @code
+     *   uint8_t width = radio.read_payload_width();
+     *   if (width > nrf24::MAX_PAYLOAD) {
+     *       // Corrupted FIFO — flush and discard
+     *       radio.flush_rx();
+     *   } else {
+     *       uint8_t buf[nrf24::MAX_PAYLOAD];
+     *       radio.read_payload(buf, width);
+     *   }
+     * @endcode
+     *
+     * @return Payload width (1-32) on success, or 0xFF on SPI failure.
+     */
+    uint8_t read_payload_width();
+
+    /**
      * @brief Read the RX payload from the FIFO.
      *
      * Sends the R_RX_PAYLOAD command (cmd::R_RX_PAYLOAD) and clocks out
