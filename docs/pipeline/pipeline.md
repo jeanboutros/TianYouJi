@@ -11,19 +11,21 @@ Multi-agent validation pipeline with tiered compliance gates, adapted for embedd
 ## Pipeline Flow Diagram
 
 ```
-Phase A: REQUIREMENTS & DESIGN ──▶ A-GATE (T3) ──▶ Phase B: BUILD ──▶ B-UNIT-GATE (T1) × N units ──▶ B-FINAL-GATE (T1+T2) ──▶ Phase C: MULTI-AGENT VERIFY ──▶ C-GATE (T1+T3) ──▶ COMMIT
+Phase A: REQUIREMENTS & DESIGN ──▶ A-GATE (T3+T-ARCH) ──▶ Phase B: BUILD ──▶ B-UNIT-GATE (T1+T-ARCH) × N units ──▶ B-FINAL-GATE (T1+T2+T-ARCH) ──▶ Phase C: MULTI-AGENT VERIFY ──▶ C-GATE (T1+T3+T-ARCH) ──▶ COMMIT
 
          ┌─────────────┐                          ┌──────────────────┐                       ┌──────────────────┐                    ┌──────────────────┐
          │  Retry loop  │                          │  Retry per unit  │                       │  Retry up to 3×  │                    │  Retry up to 3×  │
-         │  (max 3× T3) │◄───────────────────────│  (max 3× T1)    │◄─────────────────────│  (T1 + T2 indep) │◄───────────────────│  (T1 + T3 indep) │
+         │  (max 3× T3) │◄───────────────────────│  (max 3× T1)    │◄─────────────────────│  (T1+T2+T-ARCH   │◄───────────────────│  (T1+T3+T-ARCH   │
+         │  + 3× T-ARCH)│                          │  + 3× T-ARCH)   │                       │   indep per tier)│                    │   indep per tier)│
          └─────────────┘                           └──────────────────┘                       └──────────────────┘                    └──────────────────┘
               A-GATE                                    B-UNIT-GATE                              B-FINAL-GATE                            C-GATE
-         T3: 6 specialists                         T1: Mechanical only                     T1: Mechanical                          T1: Mechanical re-run
-                                                    (build, Doxygen,                      T2: Architectural                       T3: 6 specialists
+         T3: 6 specialists                         T1: Mechanical                           T1: Mechanical                          T1: Mechanical re-run
+         T-ARCH: Architecture review               T-ARCH: Architecture review              T2: Architectural                       T3: 6 specialists
+                                                    (build, Doxygen,                      T-ARCH: Architecture review             T-ARCH: Architecture review
                                                      patterns, enums)
 ```
 
-Each gate has an independent retry budget per tier (see Retry Protocol below). Worst case per gate: 3×T1 + 3×T2 + 3×T3 = 9 loops. Different tiers have independent counters — a T1 failure does not consume the T3 budget.
+Each gate has an independent retry budget per tier (see Retry Protocol below). Worst case per gate: 3×T1 + 3×T2 + 3×T3 + 3×T-ARCH = 12 loops (each tier has independent counters). A T1 failure does not consume the T2, T3, or T-ARCH budget.
 
 ---
 
@@ -82,7 +84,7 @@ esp32/
 
 ## Compliance Tiers
 
-Compliance checks are organised into three tiers with independent retry budgets. Higher tiers subsume lower tiers — T3 implies T1 and T2 pass — but each tier's retry counter is independent.
+Compliance checks are organised into four tiers with independent retry budgets. Each gate applies a specific combination of tiers. Tier checks are independent — each tier has its own retry budget. See Gate Definitions for which tiers each gate checks.
 
 ### T1 — Mechanical (Automated)
 
@@ -98,6 +100,7 @@ Checks that can be verified by automated tooling (build, grep scripts). No human
 | T1.6 | No magic numbers in @code examples | Grep for hex/decimal literals >1 in `@code` blocks within library headers | Raw literal where named constant/enum exists |
 | T1.7 | Constants in correct module | Grep for chip-level constants outside their library namespace (e.g. `NRF24_MAX_PAYLOAD` in main/) | Match in wrong module |
 | T1.8 | Reserved bits handled | Grep `to_byte()`/`from_byte()` implementations for reserved bit masking | Reserved bits not masked |
+| T1.9 | No hardcoded secrets | Grep for common secret patterns (password, api_key, secret, token, credential, Bearer) in .cpp/.h files | Any match that isn't a test fixture or explanatory comment |
 
 **Who runs T1:** Code Architect runs the checks; Supreme Leader orchestrates retry loops.
 
@@ -130,6 +133,20 @@ Checks that require deep domain expertise — datasheet fidelity, protocol corre
 
 **Who runs T3:** All six specialist agents (Software Engineer, Hardware Engineer, Wireless Expert, Security Reviewer, Test Engineer, Docs Writer).
 
+### T-ARCH — Architecture + Principles (Cross-cutting)
+
+Checks that apply to every agent output, not just at formal gate transitions. T-ARCH runs alongside whichever tier checks are active at a gate.
+
+| # | Check | Method | Fail condition |
+|---|-------|--------|----------------|
+| T-ARCH.1 | Logical consistency | No contradictions between agent outputs, datasheet, and design | Self-contradictory design |
+| T-ARCH.2 | Structural soundness | No circular dependencies, clean layering, no god objects | Circular dependency or layer violation |
+| T-ARCH.3 | Principle alignment | Follows project principles (typed API, RAII, HAL, no globals) | Principle violation |
+| T-ARCH.4 | Completeness | All requirements covered, no orphaned code, no TODO/FIXME | Missing requirement or orphaned code |
+| T-ARCH.5 | Correct agent routing | Output went to the right agent, no dispatch errors | Misrouted dispatch |
+
+**Who runs T-ARCH:** Software Engineer (code and design review); Supreme Leader (routing validation).
+
 ---
 
 ## Gate Definitions
@@ -141,12 +158,12 @@ Gates are mandatory checkpoints. Work cannot proceed past a gate until all requi
 | Property | Value |
 |----------|-------|
 | Location | Between Phase A and Phase B |
-| Tiers | T3 only (full specialist review) |
-| Who runs | All 6 specialists independently |
-| Pass | All 6 issue APPROVED or CONDITIONAL PASS |
-| Fail | Any REJECTED → loop back to Phase A with critique |
-| Retry budget | 3 loops at T3 |
-| Escalation | After 3 T3 loops → escalate to user with all findings |
+| Tiers | T3 + T-ARCH |
+| Who runs | All 6 specialists independently (T3), Software Engineer + Supreme Leader (T-ARCH) |
+| Pass | All 6 issue APPROVED or CONDITIONAL PASS, and T-ARCH checks pass |
+| Fail | Any REJECTED → loop back to Phase A with critique; T-ARCH fail → architectural fix |
+| Retry budget | 3 loops at T3, 3 loops at T-ARCH (independent) |
+| Escalation | After 3 T3 or 3 T-ARCH loops → escalate to user with all findings |
 
 A-GATE is unchanged from the previous A3 gate — it ensures all specialists have approved the architecture before any code is written.
 
@@ -155,42 +172,55 @@ A-GATE is unchanged from the previous A3 gate — it ensures all specialists hav
 | Property | Value |
 |----------|-------|
 | Location | After each logical unit in the PAU loop |
-| Tiers | T1 only (mechanical checks) |
-| Who runs | Code Architect (automated checks) |
-| Pass | All 8 T1 checks pass |
+| Tiers | T1 + T-ARCH |
+| Who runs | Code Architect (T1), Software Engineer (T-ARCH) |
+| Pass | All 9 T1 checks pass AND T-ARCH checks pass |
 | Fail | Any T1 check fails → fix and re-check the unit |
-| Retry budget | 3 loops per unit at T1 |
+| Retry budget | 3 loops per unit at T1, 3 loops at T-ARCH (independent) |
 | Escalation | After 3 T1 loops on same unit → escalate to user |
 
-Rationale: Phase B had NO quality gate. Mechanical violations (missing Doxygen, raw integers, magic numbers, banned comment patterns) leaked to Phase C where they wasted specialist time. B-UNIT-GATE catches these early, per unit, at negligible cost.
+Rationale: Phase B had NO quality gate. Mechanical violations (missing Doxygen, raw integers, magic numbers, banned comment patterns) leaked to Phase C where they wasted specialist time. B-UNIT-GATE catches these early, per unit, at negligible cost. T-ARCH catches architectural drift at the unit level before it compounds.
 
 ### B-FINAL-GATE (Exits Phase B)
 
 | Property | Value |
 |----------|-------|
 | Location | Between Phase B and Phase C |
-| Tiers | T1 + T2 (mechanical + architectural) |
-| Who runs | Code Architect (T1), Software Engineer spot-check (T2) |
-| Pass | All T1 checks pass AND all T2 checks pass |
-| Fail | T1 fail → Code Architect fixes; T2 fail → Code Architect fixes with SW Engineer input |
-| Retry budget | 3 loops at T1, 3 loops at T2 (independent) |
+| Tiers | T1 + T2 + T-ARCH |
+| Who runs | Code Architect (T1), Software Engineer spot-check (T2), Software Engineer (T-ARCH) |
+| Pass | All T1 checks pass AND all T2 checks pass AND T-ARCH checks pass |
+| Fail | T1 fail → Code Architect fixes; T2 fail → Code Architect fixes with SW Engineer input; T-ARCH fail → architectural fix |
+| Retry budget | 3 loops at T1, 3 loops at T2, 3 loops at T-ARCH (independent) |
 | Escalation | After 3 loops at same tier → escalate to user with violation log |
 
-B-FINAL-GATE ensures the Code Architect's output meets both mechanical and architectural standards before it reaches specialist review. T1 and T2 have independent retry counters — a T1 failure does not consume the T2 budget.
+B-FINAL-GATE ensures the Code Architect's output meets both mechanical and architectural standards before it reaches specialist review. T1, T2, and T-ARCH have independent retry counters — a T1 failure does not consume the T2 or T-ARCH budget.
 
 ### C-GATE (Enters Commit)
 
 | Property | Value |
 |----------|-------|
 | Location | After Phase C specialist review, before git commit |
-| Tiers | T1 re-run + T3 (mechanical re-check + full specialist review) |
-| Who runs | Code Architect (T1 re-run), All 6 specialists (T3) |
-| Pass | T1 re-run passes AND all 6 specialists issue APPROVED or CONDITIONAL PASS |
-| Fail | T1 fail → Code Architect fixes; T3 fail → route to relevant specialist(s) |
-| Retry budget | 3 loops at T1, 3 loops at T3 (independent) |
+| Tiers | T1 re-run + T3 + T-ARCH |
+| Who runs | Code Architect (T1 re-run), All 6 specialists (T3), Software Engineer + Supreme Leader (T-ARCH) |
+| Pass | T1 re-run passes AND all 6 specialists issue APPROVED or CONDITIONAL PASS AND T-ARCH checks pass |
+| Fail | T1 fail → Code Architect fixes; T3 fail → route to relevant specialist(s); T-ARCH fail → architectural fix |
+| Retry budget | 3 loops at T1, 3 loops at T3, 3 loops at T-ARCH (independent) |
 | Escalation | After 3 loops at same tier → escalate to user with all findings |
 
-C-GATE adds a T1 re-run before final specialist review. This catches any regressions introduced during B→C fixes and ensures mechanical compliance is verified on the final artifact, not just at B-FINAL-GATE.
+C-GATE adds a T1 re-run before final specialist review. This catches any regressions introduced during B→C fixes and ensures mechanical compliance is verified on the final artifact, not just at B-FINAL-GATE. T-ARCH ensures architectural principles are validated on the final artifact before commit.
+
+### Pipeline Passport
+
+Every task carries a **passport** that tracks which pipeline steps have been completed. No step may be skipped without written justification. An agent receiving a task with a missing previous step must reject it and return STATUS: BLOCKED to the Supreme Leader.
+
+Passports are stored in `docs/project-management/passports/<ticket-id>-passport.md` and are created by the PM when a ticket is opened. For the full passport format and rules, see `.opencode/skills/pipeline-passport/SKILL.md`.
+
+Key passport rules:
+
+1. **No step without a stamp** — every step must be checked off before the next step begins
+2. **No skip without justification** — a written justification and Supreme Leader authorisation are required
+3. **Loops are tracked** — every A→B→A loop is recorded in the passport's Loop History section
+4. **Passport travels with dispatch** — the passport file path is included in every dispatch envelope
 
 ---
 
@@ -208,17 +238,17 @@ The pipeline has 3 phases with tiered compliance gates at each transition. Each 
 │  - SW Engineer           │     │  - Validate      │     │  - SW Engineer           │
 │  - HW Engineer           │     │                  │     │  - HW Engineer           │
 │  - Wireless Expert       │     │  Each unit:      │     │  - Wireless Expert       │
-│  - Security Reviewer     │     │  B-UNIT-GATE T1  │     │  - Security Reviewer     │
-│  - Test Engineer         │     │                  │     │  - Test Engineer         │
+│  - Security Reviewer     │     │  B-UNIT-GATE     │     │  - Security Reviewer     │
+│  - Test Engineer         │     │  T1+T-ARCH       │     │  - Test Engineer         │
 │  - Docs Writer           │     │  All units done: │     │  - Docs Writer           │
 │                          │     │  B-FINAL-GATE    │     │                          │
-│  A-GATE: T3 only         │     │  (T1 + T2)       │     │  C-GATE: T1 re-run + T3 │
+│  A-GATE: T3+T-ARCH      │     │  (T1+T2+T-ARCH)  │     │  C-GATE: T1+T3+T-ARCH   │
 └──────────────────────────┘     └──────────────────┘     └──────────────────────────┘
 ```
 
 ---
 
-## Phase A — Requirements & Architecture (Max 3 Loops at T3)
+## Phase A — Requirements & Architecture (Max 3 Loops at T3, 3 at T-ARCH)
 
 **Goal:** Define detailed requirements and validate "What" and "How" before writing code.
 All specialist agents participate in parallel. Both models review independently (Dual-Model Challenge).
@@ -252,13 +282,14 @@ Two model passes review the architecture independently:
 
 The Supreme Leader synthesizes the strongest elements. If contradictions remain, the user decides.
 
-### A3: A-GATE (T3 — All 6 Specialists)
+### A3: A-GATE (T3 + T-ARCH — All 6 Specialists)
 
 All six specialists must issue `APPROVED` or `CONDITIONAL PASS`.
 - Any `REJECTED` → loop back with specific critique (max 3 loops at T3)
-- After 3 T3 loops → escalate to user with all critiques
+- T-ARCH failures → architectural fix (max 3 loops at T-ARCH)
+- After 3 T3 loops or 3 T-ARCH loops → escalate to user with all critiques
 
-**Why T3 only:** Phase A is a design phase. Mechanical checks (T1) are not meaningful until code exists. Architectural checks (T2) are implicitly performed during the specialist review because architecture is the subject matter. No code has been written yet, so T1 is not applicable.
+**Why T3 + T-ARCH:** Phase A is a design phase. Mechanical checks (T1) are not meaningful until code exists. Architectural checks (T2) are implicitly performed during the specialist review because architecture is the subject matter. T-ARCH is included because logical consistency, structural soundness, and principle alignment can be validated on design documents — no code is needed. No code has been written yet, so T1 is not applicable.
 
 ---
 
@@ -278,9 +309,9 @@ All six specialists must issue `APPROVED` or `CONDITIONAL PASS`.
 3. Run static_assert tests if applicable
 4. Report progress
 
-### B2a: B-UNIT-GATE (T1 — After Each Unit)
+### B2a: B-UNIT-GATE (T1 + T-ARCH — After Each Unit)
 
-**After completing each logical unit**, the Code Architect runs the full T1 mechanical check suite:
+**After completing each logical unit**, the Code Architect runs the full T1 mechanical check suite, and the Software Engineer reviews T-ARCH checks:
 
 | # | Check | Fail action |
 |---|-------|-------------|
@@ -299,7 +330,13 @@ All six specialists must issue `APPROVED` or `CONDITIONAL PASS`.
 3. Retry budget: 3 loops per unit
 4. After 3 loops → escalate to user with violation log
 
-**Only after all 8 T1 checks pass**, proceed to the next unit.
+**If any T-ARCH check fails:**
+1. Route to Software Engineer for architectural fix
+2. Re-run T-ARCH checks
+3. Retry budget: 3 loops per unit (independent of T1)
+4. After 3 loops → escalate to user
+
+**Only after all T1 AND T-ARCH checks pass**, proceed to the next unit.
 
 ### B3: VALIDATE
 After all units complete:
@@ -311,9 +348,9 @@ Must exit 0. If hardware is connected:
 idf.py -p /dev/ttyUSB0 flash monitor
 ```
 
-### B3a: B-FINAL-GATE (T1 + T2 — Exits Phase B)
+### B3a: B-FINAL-GATE (T1 + T2 + T-ARCH — Exits Phase B)
 
-**After all units pass their B-UNIT-GATEs**, the Code Architect runs T1 again (full compliance, not just deltas) and the Software Engineer spot-checks T2:
+**After all units pass their B-UNIT-GATEs**, the Code Architect runs T1 again (full compliance, not just deltas), the Software Engineer spot-checks T2, and the Software Engineer reviews T-ARCH:
 
 **T1 re-run:** All 8 mechanical checks on the complete codebase (not just the last unit).
 
@@ -329,9 +366,10 @@ idf.py -p /dev/ttyUSB0 flash monitor
 
 **If T1 fails:** Code Architect fixes, re-runs T1. Retry budget: 3 loops.
 **If T2 fails:** Code Architect fixes with Software Engineer input. Retry budget: 3 loops (independent of T1).
+**If T-ARCH fails:** Software Engineer fixes architectural violations. Retry budget: 3 loops (independent of T1 and T2).
 **After 3 loops at same tier → escalate to user** with full violation log.
 
-**Only after T1 AND T2 both pass**, proceed to Phase C.
+**Only after T1, T2, AND T-ARCH all pass**, proceed to Phase C.
 
 ### Rules
 - NEVER implement everything at once — one unit at a time
@@ -341,6 +379,7 @@ idf.py -p /dev/ttyUSB0 flash monitor
 - All new public symbols MUST have Doxygen documentation
 - T1 failures route to Code Architect (mechanical fixes)
 - T2 failures route to Code Architect with Software Engineer input
+- T-ARCH failures route to Software Engineer (architectural principle fixes)
 
 ---
 
@@ -374,7 +413,7 @@ All six specialists review the final implementation **independently**:
 | Test Engineer | Test coverage sufficient, edge cases covered, static_asserts pass |
 | Docs Writer | Doxygen complete on all new symbols, learning docs updated, refs valid |
 
-### C3: C-GATE (T1 Re-run + T3 — Full Specialist Review)
+### C3: C-GATE (T1 Re-run + T3 + T-ARCH — Full Specialist Review)
 
 **ALL six specialists must approve.** Verdicts:
 - `APPROVED` — no issues found in this agent's domain
@@ -386,9 +425,10 @@ All six specialists review the final implementation **independently**:
 **T3 failures route to relevant specialists** (current behavior). T1 failures route to Code Architect. Budgets are independent.
 
 ### Final Verdict
-- **T1 passes AND ALL 6 APPROVED** → Commit with conventional commit message
+- **T1 passes AND ALL 6 APPROVED AND T-ARCH passes** → Commit with conventional commit message
 - **T1 fails** → Code Architect fixes, re-run T1 (max 3 loops)
 - **ANY T3 REJECTED** → Route feedback to Code Architect, fix, re-submit to rejecting agent(s) only (max 3 loops at T3)
+- **T-ARCH fails** → Software Engineer fixes architectural violation (max 3 loops at T-ARCH)
 - **3 loops exhausted at any tier** → Escalate to user with all findings
 
 ### Challenger Checklist (applies to all reviewers)
@@ -425,8 +465,9 @@ Each compliance tier has an **independent** 3-retry budget at each gate.
 | T1 (Mechanical) | 3 retries per gate | Code Architect (automated fixes) |
 | T2 (Architectural) | 3 retries per gate | Code Architect with Software Engineer input |
 | T3 (Semantic) | 3 retries per gate | Relevant specialist(s) |
+| T-ARCH (Architecture + Principles) | 3 retries per gate | Software Engineer (code/design); Supreme Leader (routing) |
 
-**Key rule:** T1, T2, and T3 retry counters are independent. A T1 failure does not consume the T2 or T3 budget. Worst case per gate is 9 loops (3×T1 + 3×T2 + 3×T3), not 3 total.
+**Key rule:** T1, T2, T3, and T-ARCH retry counters are independent. A T1 failure does not consume the T2, T3, or T-ARCH budget. Worst case per gate is 12 loops (3×T1 + 3×T2 + 3×T3 + 3×T-ARCH), not 3 total.
 
 ### Retry Routing
 
@@ -435,6 +476,7 @@ Each compliance tier has an **independent** 3-retry budget at each gate.
 | T1 | Code Architect | Fix mechanical violations (build, Doxygen, patterns, enums, magic numbers, reserved bits) |
 | T2 | Code Architect + Software Engineer | Fix architectural violations (boundary, namespace, placement, API surface, globals) |
 | T3 | Relevant specialist(s) | Fix semantic violations (datasheet, protocol, security, test, docs) |
+| T-ARCH | Software Engineer (code/design); Supreme Leader (routing) | Fix architectural principle violations (consistency, structure, alignment, completeness, routing) |
 
 ### Escalation
 
@@ -450,10 +492,10 @@ The user decides: relax the requirement, fix manually, or restructure.
 
 | Gate | Tiers | Retry budget | Escalation trigger |
 |------|-------|-------------|-------------------|
-| A-GATE | T3 | 3×T3 | 3 T3 loops |
-| B-UNIT-GATE | T1 | 3×T1 | 3 T1 loops on same unit |
-| B-FINAL-GATE | T1 + T2 | 3×T1, 3×T2 (indep) | 3 loops at same tier |
-| C-GATE | T1 + T3 | 3×T1, 3×T3 (indep) | 3 loops at same tier |
+| A-GATE | T3 + T-ARCH | 3×T3, 3×T-ARCH (indep) | 3 loops at same tier |
+| B-UNIT-GATE | T1 + T-ARCH | 3×T1, 3×T-ARCH (indep) | 3 T1 or 3 T-ARCH loops on same unit |
+| B-FINAL-GATE | T1 + T2 + T-ARCH | 3×T1, 3×T2, 3×T-ARCH (indep) | 3 loops at same tier |
+| C-GATE | T1 + T3 + T-ARCH | 3×T1, 3×T3, 3×T-ARCH (indep) | 3 loops at same tier |
 
 ---
 
@@ -507,7 +549,7 @@ When an issue is found that doesn't block the current task:
 
 | Field      | Value |
 |-----------|-------|
-| Type       | `task` / `clarification` / `advisory` |
+| Type       | `task` / `clarification` / `decision` / `advisory` |
 | Priority   | `critical` / `high` / `medium` / `low` |
 | Raised by  | Agent role |
 | Blocking   | `yes` / `no` |
@@ -529,9 +571,9 @@ Recommendation.
 
 1. Identify logical units within the task
 2. Implement one unit → `idf.py build` → confirm pass
-3. **Run B-UNIT-GATE (T1) after each unit** → all 8 T1 checks must pass
+3. **Run B-UNIT-GATE (T1 + T-ARCH) after each unit** → all 9 T1 + 5 T-ARCH checks must pass
 4. Report progress between units
-5. Only after ALL units pass B-UNIT-GATE → run B-FINAL-GATE (T1+T2)
+5. Only after ALL units pass B-UNIT-GATE → run B-FINAL-GATE (T1+T2+T-ARCH)
 6. Only after B-FINAL-GATE passes → proceed to Phase C
 7. Never commit code that doesn't build AND pass all T1 checks
 

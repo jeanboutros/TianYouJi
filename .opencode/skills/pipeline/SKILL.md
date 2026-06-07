@@ -48,7 +48,7 @@ This skill defines the complete pipeline workflow that all agents must follow. I
 | B3 | VALIDATE | Full build, optional flash | Code Architect |
 | B3a | B-FINAL-GATE | T1 + T2 + T-ARCH compliance check after all units | Code Architect (T1), SW Engineer (T2 + T-ARCH) |
 
-**B-UNIT-GATE pass criteria:** All 8 T1 checks pass + T-ARCH passes.
+**B-UNIT-GATE pass criteria:** All 9 T1 checks pass + T-ARCH passes.
 **B-FINAL-GATE pass criteria:** T1 passes + T2 passes + T-ARCH passes.
 **Failure routing:** T1 → Code Architect fixes; T2 → Code Architect + Software Engineer input; T-ARCH → Software Engineer.
 
@@ -185,6 +185,7 @@ phase: "<A|B|C>"
 step: "<A0|A1|A2|A3|B1|B2|B2a|B3|B3a|C0|C1|C2|C3>"
 trigger: "<reason for this dispatch>"
 agent: "<agent-role>"
+passport: "docs/project-management/passports/<ticket-id>-passport.md"
 skills_loaded:
   - "assumption-trap"
   - "compliance-gate"
@@ -212,6 +213,7 @@ OWASP_expansion: "<none | list of added compliance categories>"
 | `step` | Current step within the phase |
 | `trigger` | Why this dispatch occurred (e.g. "A-GATE failed: T3.1 datasheet fidelity") |
 | `agent` | The agent being dispatched to |
+| `passport` | Path to the pipeline passport file tracking completed steps for this task |
 | `skills_loaded` | List of skills loaded for this dispatch (always includes core skills) |
 | `expected_outcomes` | Concrete, verifiable deliverables expected |
 | `next_agent` | Who receives the output next |
@@ -228,7 +230,7 @@ Which agent handles which intent:
 |--------|-------|---------------|
 | Architecture design | Software Engineer | assumption-trap, compliance-gate, type-design-review |
 | Register model design | Hardware Engineer | assumption-trap, datasheet-verification, nrf24l01plus |
-| RF protocol design | Wireless Expert | assumption-trap, datasheet-verification, nrf24l01plus |
+| RF protocol design | Wireless Expert | assumption-trap, datasheet-verification, nrf24l01plus, ble-protocol |
 | Security analysis | Security Reviewer | assumption-trap, silent-failure, memory-safety |
 | Test strategy | Test Engineer | assumption-trap, test-driven-development |
 | Documentation plan | Docs Writer | assumption-trap, verification-before-completion |
@@ -237,6 +239,7 @@ Which agent handles which intent:
 | T2 architectural review | Software Engineer | compliance-gate, type-design-review |
 | T3 semantic review | All 6 specialists | compliance-gate, domain-specific skills |
 | T-ARCH review | Software Engineer | compliance-gate, type-design-review |
+| Memory safety review | Memory Safety | assumption-trap, memory-safety |
 | Gate orchestration | Supreme Leader | pipeline, compliance-gate, flag-protocol |
 | Dispatch/routing only | Supreme Leader | pipeline, flag-protocol |
 | Task creation | PM | pipeline, flag-protocol |

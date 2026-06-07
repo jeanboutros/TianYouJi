@@ -64,6 +64,10 @@ If you catch yourself about to claim success without evidence:
 2. Run the verification command
 3. THEN make the claim with evidence attached
 
+## T1 Compliance Note
+
+For T1 compliance verification, run `bash docs/pipeline/scripts/t1-check.sh`. Build alone (T1.1) is not sufficient — all T1 checks must pass. The t1-check.sh script covers T1.1 through T1.9.
+
 ## Self-Reflection Clause
 
 After fixing any bug or resolving any issue that required debugging, you MUST ask:

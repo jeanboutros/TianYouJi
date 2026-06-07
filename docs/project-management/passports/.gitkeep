@@ -1,0 +1,5 @@
+# Pipeline Passports
+
+Task passports are stored here. Each passport tracks the full pipeline state for a task.
+
+See .opencode/skills/pipeline-passport/SKILL.md for the passport format and rules.

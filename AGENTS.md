@@ -18,7 +18,7 @@ All agents follow this initialisation sequence:
 
 1. **Assumption trap** — load `assumption-trap` FIRST before any analysis
 2. **Domain skills** — load skills from the Tech Stack table relevant to the task
-3. **Pipeline skill** — load `pipeline` when working with gates or phase transitions
+3. **Pipeline skills** — load `pipeline` when working with gates or phase transitions; load `pipeline-passport` for task tracking
 4. **Process skills** — load `pau-loop`, `incremental-execution`, `test-driven-development`, or `systematic-debugging` as the task requires
 5. **Review skills** — load `self-audit-checklist` before any Phase C verdict; load `datasheet-verification` before confirming any register value
 
@@ -38,7 +38,8 @@ All agents follow this initialisation sequence:
 | `flag-protocol` | Raise issues for PM attention |
 | `datasheet-verification` | Verify hardware claims against datasheets |
 | `pipeline` | Pipeline phases, gates, compliance tiers, agent roles |
-| `compliance-gate` | T1/T2/T3 gate checks and retry budgets |
+| `compliance-gate` | T1/T2/T3/T-ARCH gate checks and retry budgets |
+| `pipeline-passport` | Pipeline passport tracking — every task carries a passport with stamped steps |
 | `nrf24l01plus` | nRF24L01+ chip traps, diagnostics, register order |
 | `esp-idf` | ESP-IDF build, FreeRTOS, SPI, GPIO, monitor, VS Code |
 | `cpp-embedded` | Typed enums, register structs, Doxygen, HAL, platform independence |
@@ -53,10 +54,10 @@ All agents follow this initialisation sequence:
 ## Pipeline Summary
 
 ```
-Phase A ──▶ A-GATE (T3) ──▶ Phase B ──▶ B-UNIT-GATE (T1)×N ──▶ B-FINAL-GATE (T1+T2) ──▶ Phase C ──▶ C-GATE (T1+T3) ──▶ COMMIT
+Phase A ──▶ A-GATE (T3+T-ARCH) ──▶ Phase B ──▶ B-UNIT-GATE (T1+T-ARCH)×N ──▶ B-FINAL-GATE (T1+T2+T-ARCH) ──▶ Phase C ──▶ C-GATE (T1+T3+T-ARCH) ──▶ COMMIT
 ```
 
-T1 = Mechanical (build, Doxygen, banned patterns) · T2 = Architectural (library boundary, namespaces, typed API) · T3 = Semantic (datasheet, protocol, security)
+T1 = Mechanical (build, Doxygen, banned patterns) · T2 = Architectural (library boundary, namespaces, typed API) · T3 = Semantic (datasheet, protocol, security) · T-ARCH = Architecture + Principles (cross-cutting consistency, structure, principle alignment)
 
 See `pipeline` skill for full definitions, agent roles, and gate retry rules.
 
@@ -82,7 +83,7 @@ See `pipeline` skill for full definitions, agent roles, and gate retry rules.
 | Serial port | `/dev/ttyUSB0` (verify with `ls /dev/ttyUSB*`) |
 | CE pin | GPIO4 (was GPIO5 — migrated to avoid SPI3 IO_MUX overlap; see `nrf24l01plus` skill §1.3) |
 | Pipeline spec | `docs/pipeline/pipeline.md` |
-| Agent roles | `docs/pipeline/agents.md` |
+| Agent roles | `.opencode/skills/pipeline/SKILL.md` |
 | Task tracker | `docs/pipeline/TODO.md` |
 
 ## Git Commit Rules

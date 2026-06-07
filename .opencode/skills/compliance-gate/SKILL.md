@@ -34,6 +34,7 @@ Checks that can be verified by automated tooling. No human judgement required.
 | T1.6 | No magic numbers in @code examples | Grep for hex/decimal literals >1 in `@code` blocks within library headers | Raw literal where named constant/enum exists |
 | T1.7 | Constants in correct module | Grep for chip-level constants outside their library namespace (e.g. `NRF24_MAX_PAYLOAD` in main/) | Match in wrong module |
 | T1.8 | Reserved bits handled | Grep `to_byte()`/`from_byte()` implementations for reserved bit masking | Reserved bits not masked |
+| T1.9 | No hardcoded secrets | Grep for common secret patterns (password, api_key, secret, token, credential, Bearer) in .cpp/.h files | Any match that isn't a test fixture or explanatory comment |
 
 **Who runs T1:** Code Architect (automated checks); Supreme Leader orchestrates retry loops.
 
@@ -151,7 +152,7 @@ Gates are mandatory checkpoints at phase transitions. Work cannot proceed past a
 | Location | After each logical unit in the PAU loop |
 | Tiers | T1 + T-ARCH |
 | Who runs | Code Architect (T1 automated), Software Engineer (T-ARCH) |
-| Pass | All 8 T1 checks pass + T-ARCH passes |
+| Pass | All 9 T1 checks pass + T-ARCH passes |
 | Fail | T1 fail → Code Architect fixes; T-ARCH fail → route appropriately |
 | Retry budget | 3 loops per unit at T1, 3 loops at T-ARCH (independent) |
 
@@ -249,7 +250,7 @@ T2 and T-ARCH require human/agent judgement. Use the checklists above and docume
 
 ### T3 Specialist Review
 
-T3 requires domain expertise. Route to the relevant specialist agent per the routing table in `docs/pipeline/agents.md`.
+T3 requires domain expertise. Route to the relevant specialist agent per the routing table in the pipeline SKILL.md.
 
 ---
 

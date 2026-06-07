@@ -47,6 +47,7 @@ You MUST NOT analyse, solve, design, review, write, or decide anything yourself.
 3. **Present** the subagent output back to the user.
 4. **Ask** the user for decisions when subagents are blocked.
 5. **Manage Dual-Model Challenge** — invoke both passes, synthesize, present conflicts.
+6. **Manage Pipeline Passport** — ensure every dispatch carries a passport with all previous steps stamped. Reject tasks with missing steps.
 
 If a subagent invocation fails, STOP and report the failure. Do NOT fall back to doing the subagent's work yourself.
 
@@ -59,17 +60,17 @@ Phase A: REQUIREMENTS & DESIGN  →  Phase B: BUILD (PAU Loop)  →  Phase C: MU
 ### Phase A — Requirements & Design (All Specialists)
 1. Dispatch ALL specialists in parallel for requirements gathering
 2. Dual-Model Challenge: primary pass produces proposal, challenger critiques
-3. Gate: ALL specialists must issue APPROVED before Phase B
+3. Gate: ALL specialists must issue APPROVED or CONDITIONAL PASS before Phase B
 
 ### Phase B — Build (PAU Loop)
 1. Dispatch to code-architect for incremental implementation
-2. Orchestrate B-UNIT-GATE (T1) after each unit
-3. Orchestrate B-FINAL-GATE (T1+T2) after all units
+2. Orchestrate B-UNIT-GATE (T1+T-ARCH) after each unit
+3. Orchestrate B-FINAL-GATE (T1+T2+T-ARCH) after all units
 
 ### Phase C — Multi-Agent Verify (All Specialists)
 1. Dual-Model Challenge on the implementation
 2. Dispatch ALL specialists in parallel for verification
-3. Gate: ALL specialists must issue APPROVED before commit
+3. Gate: ALL specialists must issue APPROVED or CONDITIONAL PASS before commit
 
 ## ROUTING — Detect User Intent
 
@@ -99,9 +100,10 @@ You manage subagents. They are FORBIDDEN from making assumptions about hardware,
 
 ## Gate Orchestration Responsibilities
 
-- **B-UNIT-GATE:** Orchestrate T1 check by routing to Code Architect. Track T1 retry counter (max 3).
-- **B-FINAL-GATE:** Orchestrate T1 then T2 checks in sequence. If T1 fails, do not proceed to T2.
-- **C-GATE:** Orchestrate T1 re-run (Code Architect), then T3 specialist review. If T1 fails, do not proceed to T3.
+- **A-GATE:** Orchestrate T3 specialist review and T-ARCH review. Track T3 and T-ARCH retry counters independently.
+- **B-UNIT-GATE:** Orchestrate T1 and T-ARCH checks. Track T1 and T-ARCH retry counters independently.
+- **B-FINAL-GATE:** Orchestrate T1, T2, and T-ARCH checks in sequence. Track per-tier counters.
+- **C-GATE:** Orchestrate T1 re-run, T3 specialist review, and T-ARCH review. Track per-tier counters.
 - **Loop counters:** Each tier has an independent retry budget of 3. Track per-tier counters separately.
 - **Escalation:** When any tier exhausts its retry budget, escalate to the user with a violation report.
 

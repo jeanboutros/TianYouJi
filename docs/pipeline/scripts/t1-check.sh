@@ -13,6 +13,7 @@
 #   6. No magic numbers in @code examples
 #   7. Constants in correct module
 #   8. Reserved bits handled in to_byte()/from_byte()
+#   9. No hardcoded secrets
 #
 # SELF-REFLECTION CLAUSE
 # When T1 catches a violation:
@@ -898,6 +899,74 @@ check_8_reserved_bits() {
     return 0
 }
 
+# ─── Check 9: No hardcoded secrets ─────────────────────────────────────
+
+check_9_no_hardcoded_secrets() {
+    local violations_found=0
+    local tmp_violations=""
+
+    # Patterns that indicate hardcoded secrets
+    local secret_patterns=(
+        "password"
+        "api_key"
+        "secret"
+        "token"
+        "credential"
+        "Bearer"
+    )
+
+    # Only scan .cpp and .h files in components and main
+    while IFS= read -r -d '' srcfile; do
+        local rel_path="${srcfile#$PROJECT_ROOT/}"
+
+        # Skip documentation, build, and this script
+        if [[ "$rel_path" =~ ^docs/ ]]; then continue; fi
+        if [[ "$rel_path" =~ ^build/ ]]; then continue; fi
+        if [[ "$rel_path" =~ t1-check\.sh ]]; then continue; fi
+
+        # Skip test files (test fixtures are allowed)
+        if [[ "$rel_path" =~ /test/ ]]; then continue; fi
+
+        for pattern in "${secret_patterns[@]}"; do
+            # Case-sensitive search for the pattern
+            # Use grep to find matches, but filter out explanatory comments
+            local matches
+            matches=$(grep -n "${pattern}" "$srcfile" 2>/dev/null || true)
+            if [ -n "$matches" ]; then
+                while IFS= read -r match; do
+                    # Skip if the line is clearly a comment explaining the check
+                    local trimmed_match
+                    trimmed_match=$(echo "$match" | sed 's/^[[:space:]]*//')
+                    # Skip lines that are Doxygen comments describing what the check does
+                    if [[ "$trimmed_match" =~ ^[0-9]+:[[:space:]]*(//|/\*|\*) ]]; then
+                        # Check if this is an explanatory comment, not an actual secret
+                        if [[ "$trimmed_match" =~ (hardcoded|check|scan|pattern|T1\.9|grep|for) ]]; then
+                            continue
+                        fi
+                    fi
+                    # Skip if the pattern appears in a type name or namespace (e.g., BearerToken as a type)
+                    if [[ "$match" =~ (class|struct|enum|typedef|using).*${pattern} ]]; then
+                        continue
+                    fi
+                    tmp_violations="${tmp_violations}\n    ${rel_path}: ${match}"
+                    violations_found=$((violations_found + 1))
+                done <<< "$matches"
+            fi
+        done
+
+    done < <(find "$PROJECT_ROOT/components" "$PROJECT_ROOT/main" \
+             \( -name '*.cpp' -o -name '*.h' \) -print0 2>/dev/null)
+
+    if [ "$violations_found" -gt 0 ]; then
+        add_violation 9 "Found ${violations_found} hardcoded secret pattern(s) in source code:${tmp_violations}"
+        report_check 9 "No hardcoded secrets" "FAIL"
+        return 1
+    fi
+
+    report_check 9 "No hardcoded secrets" "PASS"
+    return 0
+}
+
 # ─── Main ──────────────────────────────────────────────────────────────
 
 echo "========================================"
@@ -930,6 +999,9 @@ check_7_constants_in_module || RESULT=1
 
 # Check 8: Reserved bits handled in to_byte()/from_byte()
 check_8_reserved_bits || RESULT=1
+
+# Check 9: No hardcoded secrets
+check_9_no_hardcoded_secrets || RESULT=1
 
 echo ""
 echo "========================================"

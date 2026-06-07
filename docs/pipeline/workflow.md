@@ -128,7 +128,7 @@ Gates are **mandatory checkpoints**. Work cannot proceed past a gate until all r
 | **Fail action** | Loop back to A1 with specific critique |
 | **Retry budget** | 3 loops at T3, 3 loops at T-ARCH (independent) |
 
-**Why T3 only (no T1/T2)?** Phase A is a design phase. There's no code yet, so mechanical checks (build, Doxygen, banned patterns) aren't meaningful. Architecture is the subject matter being reviewed, so T2 is implicitly covered by the T3 specialist review.
+**Why T3 + T-ARCH (no T1/T2)?** Phase A is a design phase. There's no code yet, so mechanical checks (T1) aren't meaningful. Architecture is the subject matter being reviewed, so T2 is implicitly covered by the T3 specialist review. T-ARCH is included because logical consistency, structural soundness, and principle alignment can be validated on design documents — no code is needed.
 
 ---
 
@@ -139,7 +139,7 @@ Gates are **mandatory checkpoints**. Work cannot proceed past a gate until all r
 | **When** | After each logical unit in the PAU loop |
 | **What it checks** | T1 (mechanical) + T-ARCH (principles) |
 | **Who runs it** | Code Architect (T1), Software Engineer (T-ARCH) |
-| **Pass criteria** | All 8 T1 checks pass + T-ARCH passes |
+| **Pass criteria** | All 9 T1 checks pass + T-ARCH passes |
 | **Fail action** | Fix the unit, re-check |
 | **Retry budget** | 3 loops per unit at T1, 3 loops at T-ARCH (independent) |
 
@@ -199,6 +199,7 @@ Compliance checks are organized into four tiers, each with increasing scope and 
 | T1.6 | No magic numbers in @code examples | Hex literals like `0x03` in Doxygen examples where named constants exist |
 | T1.7 | Constants in correct module | Chip-level constants outside their library namespace |
 | T1.8 | Reserved bits handled | `to_byte()`/`from_byte()` must mask reserved bits |
+| T1.9 | No hardcoded secrets | No common secret patterns (password, api_key, secret, token, credential, Bearer) in .cpp/.h that aren't test fixtures or comments |
 
 **Analogy:** Like a linter or CI check — mechanical, repeatable, binary pass/fail.
 
@@ -509,6 +510,7 @@ phase: "B"                             # Current pipeline phase (A, B, or C)
 step: "B2a"                            # Current step within the phase
 trigger: "B-UNIT-GATE failed: T1.5"   # Why this dispatch occurred
 agent: "code-architect"                # Which agent is being dispatched
+passport: "docs/project-management/passports/nrf-0016-passport.md"  # Pipeline passport
 skills_loaded:
   - "assumption-trap"
   - "compliance-gate"
@@ -575,7 +577,7 @@ COMMIT (git commit with conventional commit message)
 |--------|-------|--------------|
 | Architecture design | Software Engineer | assumption-trap, compliance-gate, type-design-review |
 | Register model design | Hardware Engineer | assumption-trap, datasheet-verification, nrf24l01plus |
-| RF protocol design | Wireless Expert | assumption-trap, datasheet-verification, nrf24l01plus |
+| RF protocol design | Wireless Expert | assumption-trap, datasheet-verification, nrf24l01plus, ble-protocol |
 | Security analysis | Security Reviewer | assumption-trap, silent-failure, memory-safety |
 | Test strategy | Test Engineer | assumption-trap, test-driven-development |
 | Documentation plan | Docs Writer | assumption-trap, verification-before-completion |
@@ -584,6 +586,7 @@ COMMIT (git commit with conventional commit message)
 | T2 architectural review | Software Engineer | compliance-gate, type-design-review |
 | T3 semantic review | All 6 specialists | compliance-gate, domain-specific skills |
 | T-ARCH review | Software Engineer | compliance-gate, type-design-review |
+| Memory safety review | Memory Safety | assumption-trap, memory-safety |
 | Gate orchestration | Supreme Leader | pipeline, compliance-gate, flag-protocol |
 | Task creation | PM | pipeline, flag-protocol |
 | Debugging | Code Architect | systematic-debugging, nrf24l01plus |
@@ -712,3 +715,18 @@ Here's the complete pipeline in one view:
 ---
 
 *This document is a companion to `docs/pipeline/pipeline.md` (the formal specification) and `.opencode/skills/pipeline/SKILL.md` (the agent-facing state machine). For the complete tier definitions, checklists, and violation report formats, see those documents.*
+
+---
+
+## 11. Pipeline Passport
+
+Every task carries a **passport** that tracks which pipeline steps have been completed. No step may be skipped without written justification.
+
+**Key rules:**
+
+1. **No step without a stamp** — every step must be checked off before the next step begins
+2. **No skip without justification** — a written justification and Supreme Leader authorisation are required
+3. **Loops are tracked** — every A→B→A loop is recorded in the passport's Loop History section
+4. **Passport travels with dispatch** — the passport file path is included in every dispatch envelope
+
+Passports are stored in `docs/project-management/passports/<ticket-id>-passport.md` and are created by the PM when a ticket is opened. For the full passport format and rules, see `.opencode/skills/pipeline-passport/SKILL.md`.
