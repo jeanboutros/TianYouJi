@@ -50,6 +50,9 @@ This project uses a 3-phase validation pipeline for all non-trivial changes.
 | `memory-safety` | C++ memory leak, RAII, ASAN, heap/stack safety | All agents |
 | `ubertooth` | Ubertooth One BLE testing and cross-validation (TX/RX, firmware update, dewhitening validation) | All agents using Ubertooth or cross-validation |
 | `nrf52840-sniffer` | Nordic nRF52840 Dongle BLE sniffer for cross-validation (Wireshark extcap, PDU comparison) | All agents using nRF Sniffer or cross-validation |
+| `esp-idf` | ESP-IDF framework, FreeRTOS, SPI bus, GPIO modes, build system, monitor control, VS Code diagnostics | All agents working with ESP-IDF APIs or ESP32 hardware |
+| `cpp-embedded` | C++ patterns for embedded libraries — typed enums, register structs, Doxygen, HAL interfaces, platform independence | Code Architect, Software Engineer, HW Engineer, Test Engineer |
+| `ble-protocol` | BLE protocol details — advertising channels, PDU types, data whitening, bit order, access addresses, CRC-24 | All agents working with BLE sniffing, transmission, or protocol code |
 
 ### Pipeline Summary
 
