@@ -242,7 +242,7 @@ After 3 loops at the same tier → **ESCALATE to user** with:
 bash docs/pipeline/scripts/t1-check.sh
 ```
 
-This script runs T1.1–T1.8 against the codebase. Exit code 0 means all pass.
+This script runs T1.1–T1.9 against the codebase. Exit code 0 means all pass.
 
 ### Manual T2 and T-ARCH Checks
 

@@ -323,6 +323,7 @@ All six specialists must issue `APPROVED` or `CONDITIONAL PASS`.
 | T1.6 | No magic numbers in @code examples | Replace with named constants/enums |
 | T1.7 | Constants in correct module | Move constant to correct namespace/file |
 | T1.8 | Reserved bits handled | Add masking in `to_byte()`/`from_byte()` |
+| T1.9 | No hardcoded secrets | Remove hardcoded passwords, API keys, tokens, credentials |
 
 **If any T1 check fails:**
 1. Fix the violation
@@ -352,7 +353,7 @@ idf.py -p /dev/ttyUSB0 flash monitor
 
 **After all units pass their B-UNIT-GATEs**, the Code Architect runs T1 again (full compliance, not just deltas), the Software Engineer spot-checks T2, and the Software Engineer reviews T-ARCH:
 
-**T1 re-run:** All 8 mechanical checks on the complete codebase (not just the last unit).
+**T1 re-run:** All 9 mechanical checks on the complete codebase (not just the last unit).
 
 **T2 Architectural checks:**
 

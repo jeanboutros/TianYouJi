@@ -255,7 +255,7 @@ Independent derivation produces `{0x71, 0x91, 0x7D, 0x6B}` — not what the code
 
 ### 5.1 No Requirement to Address Challenger Cited Evidence
 
-The pipeline specification in `docs/pipeline/pipeline.md` and `docs/pipeline/agents.md` defines the Dual-Model Challenge protocol but does not require:
+The pipeline specification in `docs/pipeline/pipeline.md` and `.opencode/skills/pipeline/SKILL.md` defines the Dual-Model Challenge protocol but does not require:
 - Step-by-step reproduction of the challenger's argument
 - Explicit addressal of each datasheet section cited by the challenger
 - Independent derivation of the correct value before dismissing a challenger finding
@@ -375,7 +375,7 @@ value independently from the specification, not from the constant being verified
 
 #### 6.2.3 Addition to Dual-Model Challenge Protocol
 
-Add to `docs/pipeline/agents.md`, §"Dual-Model Challenge Protocol":
+Add to `.opencode/skills/pipeline/SKILL.md`, §"Dual-Model Challenge Protocol":
 
 ```markdown
 ### Challenger Dismissal Requirements

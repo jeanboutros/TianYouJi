@@ -28,15 +28,28 @@ When first dispatched, this agent MUST:
 Every dispatch carries a structured envelope:
 
 ```yaml
-phase: A | B | C
-step: A0 | A1 | A2 | A3 | B1 | B2 | B2a | B3 | B3a | C0 | C1 | C2 | C3
+phase: "<A|B|C>"
+step: "<A0|A1|A2|A3|B1|B2|B2a|B3|B3a|C0|C1|C2|C3>"
 trigger_event: user_request | gate_pass | gate_fail | specialist_verdict | flag_raised
+passport: "docs/project-management/passports/<ticket-id>-passport.md"
+skills_loaded:
+  - "assumption-trap"
+  - "compliance-gate"
+  - "pipeline"
+  - "pau-loop"
+  - "<domain-specific-skills>"
 expected_outcomes:
   - specialist_verdicts: list of APPROVED / CONDITIONAL PASS / REJECTED
   - gate_status: PASS | FAIL_WITH_RETRIES | ESCALATE
   - next_step: phase step to proceed to
   - flags: list of flags raised during this step
-output_to: user (for decisions) | specialist_agents (for dispatch) | pm (for flags)
+next_agent: "<agent-role or 'user' for escalation>"
+retry_count:
+  T1: <number>
+  T2: <number>
+  T3: <number>
+  T-ARCH: <number>
+OWASP_expansion: "<none | list of added compliance categories>"
 ```
 
 ## DISPATCH-ONLY RULE
