@@ -99,7 +99,7 @@ Checks that can be verified by automated tooling (build, grep scripts). No human
 | T1.7 | Constants in correct module | Grep for chip-level constants outside their library namespace (e.g. `NRF24_MAX_PAYLOAD` in main/) | Match in wrong module |
 | T1.8 | Reserved bits handled | Grep `to_byte()`/`from_byte()` implementations for reserved bit masking | Reserved bits not masked |
 
-**Who runs T1:** Code Architect runs the checks; Agency Director orchestrates retry loops.
+**Who runs T1:** Code Architect runs the checks; Supreme Leader orchestrates retry loops.
 
 ### T2 — Architectural (Agent Delta Review)
 
@@ -250,7 +250,7 @@ Two model passes review the architecture independently:
 1. **Primary pass** — produces the architecture proposal
 2. **Challenger pass** — critiques the primary, identifies gaps and contradictions
 
-The Agency Director synthesizes the strongest elements. If contradictions remain, the user decides.
+The Supreme Leader synthesizes the strongest elements. If contradictions remain, the user decides.
 
 ### A3: A-GATE (T3 — All 6 Specialists)
 

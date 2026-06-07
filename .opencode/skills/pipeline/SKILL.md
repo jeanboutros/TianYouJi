@@ -28,7 +28,7 @@ This skill defines the complete pipeline workflow that all agents must follow. I
 |------|------|-------------|-----|
 | A0 | Task Definition | Produce detailed task specification: acceptance criteria, files, constraints, test strategy, doc plan | All agents collaborate |
 | A1 | Parallel Specialist Review | All 6 specialists review the proposal independently | SW Engineer, HW Engineer, Wireless Expert, Security Reviewer, Test Engineer, Docs Writer |
-| A2 | Dual-Model Challenge | Two model passes review architecture: primary produces, challenger critiques | Agency Director orchestrates |
+| A2 | Dual-Model Challenge | Two model passes review architecture: primary produces, challenger critiques | Supreme Leader orchestrates |
 | A3 | A-GATE | T3 + T-ARCH compliance check | All 6 specialists (T3), SW Engineer (T-ARCH) |
 
 **A-GATE pass criteria:** All 6 specialists issue APPROVED or CONDITIONAL PASS + T-ARCH passes.
@@ -61,7 +61,7 @@ This skill defines the complete pipeline workflow that all agents must follow. I
 | Step | Name | Description | Who |
 |------|------|-------------|-----|
 | C0 | T1 Re-run | Mechanical compliance re-check on final codebase | Code Architect |
-| C1 | Dual-Model Challenge (Verification) | Primary verifier + challenger verifier | Agency Director orchestrates |
+| C1 | Dual-Model Challenge (Verification) | Primary verifier + challenger verifier | Supreme Leader orchestrates |
 | C2 | Parallel Specialist Approval | All 6 specialists review independently | All 6 specialists |
 | C3 | C-GATE | T1 re-run + T3 + T-ARCH | Code Architect (T1), Specialists (T3), SW Engineer (T-ARCH) |
 
@@ -171,7 +171,7 @@ This skill defines the complete pipeline workflow that all agents must follow. I
 | C2 | Reviews complete | C3 | All 6 specialists reviewed |
 | C3 | C-GATE passes | COMMIT | All APPROVED + T1 pass + T-ARCH pass |
 | C3 | C-GATE fails | C2 or B2 | Route to appropriate fixer (max 3× per tier) |
-| Any | 3 retries exhausted at any tier | ESCALATE | Agency Director presents full violation report to user |
+| Any | 3 retries exhausted at any tier | ESCALATE | Supreme Leader presents full violation report to user |
 
 ---
 
@@ -237,8 +237,8 @@ Which agent handles which intent:
 | T2 architectural review | Software Engineer | compliance-gate, type-design-review |
 | T3 semantic review | All 6 specialists | compliance-gate, domain-specific skills |
 | T-ARCH review | Software Engineer | compliance-gate, type-design-review |
-| Gate orchestration | Agency Director | pipeline, compliance-gate, flag-protocol |
-| Dispatch/routing only | Agency Director | pipeline, flag-protocol |
+| Gate orchestration | Supreme Leader | pipeline, compliance-gate, flag-protocol |
+| Dispatch/routing only | Supreme Leader | pipeline, flag-protocol |
 | Task creation | PM | pipeline, flag-protocol |
 | Debugging | Code Architect | systematic-debugging, nrf24l01plus |
 
@@ -258,7 +258,7 @@ Used in **Phase A** (architecture) and **Phase C** (verification).
    - Security gaps
    - Protocol non-compliance
    - T-ARCH violations (logical errors, structural issues, principle misalignment)
-3. **Synthesis** — Agency Director merges findings:
+3. **Synthesis** — Supreme Leader merges findings:
    - Agreements → accepted
    - Contradictions → presented to user for decision
    - One-sided findings → accepted if well-evidenced, otherwise flagged

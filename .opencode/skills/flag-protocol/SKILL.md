@@ -45,7 +45,7 @@ What the flagging agent recommends.
 
 | Blocking? | Route | Effect |
 |-----------|-------|--------|
-| Yes | Agency Director pauses pipeline | Presented to user immediately |
+| Yes | Supreme Leader pauses pipeline | Presented to user immediately |
 | No | Queued for PM | PM creates task in next planning cycle |
 | Advisory | Logged | Persisted for future reference |
 

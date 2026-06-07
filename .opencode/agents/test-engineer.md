@@ -35,7 +35,7 @@ expected_outcomes:
   - coverage: N/M acceptance criteria have test evidence
   - gaps: list of untested behaviours
   - routing: if rejected, who fixes (code-architect or self for test gaps)
-output_to: agency-director (for verdicts) | code-architect (for test requirements)
+output_to: supreme-leader (for verdicts) | code-architect (for test requirements)
 ```
 
 ## Phase A — Requirements & Design

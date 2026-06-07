@@ -35,7 +35,7 @@ expected_outcomes:
   - task_updated: status change in TODO.md
   - decision_recorded: new entry in decision log
   - flag_processed: flag status updated
-output_to: agency-director (for task status updates) | specialist_agents (for task assignments)
+output_to: supreme-leader (for task status updates) | specialist_agents (for task assignments)
 ```
 
 ## Responsibilities

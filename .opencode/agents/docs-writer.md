@@ -35,7 +35,7 @@ expected_outcomes:
   - coverage: N new symbols, M documented, K missing
   - findings: list of missing docs with file:line references
   - routing: if rejected, who fixes (code-architect for inline docs, self for learning docs)
-output_to: agency-director (for verdicts)
+output_to: supreme-leader (for verdicts)
 ```
 
 ## Phase A — Requirements & Design

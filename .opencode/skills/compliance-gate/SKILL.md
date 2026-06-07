@@ -35,7 +35,7 @@ Checks that can be verified by automated tooling. No human judgement required.
 | T1.7 | Constants in correct module | Grep for chip-level constants outside their library namespace (e.g. `NRF24_MAX_PAYLOAD` in main/) | Match in wrong module |
 | T1.8 | Reserved bits handled | Grep `to_byte()`/`from_byte()` implementations for reserved bit masking | Reserved bits not masked |
 
-**Who runs T1:** Code Architect (automated checks); Agency Director orchestrates retry loops.
+**Who runs T1:** Code Architect (automated checks); Supreme Leader orchestrates retry loops.
 
 ### T2 — Architectural (Agent Delta Review)
 
@@ -82,7 +82,7 @@ T-ARCH is **always applied** alongside whichever tier checks are running. It is 
 
 **T-ARCH is evaluated by:**
 - The **Software Engineer** for code and design outputs
-- The **Agency Director** for routing and dispatch decisions
+- The **Supreme Leader** for routing and dispatch decisions
 - Any specialist reviewing a document or plan for their domain
 
 ---
@@ -93,7 +93,7 @@ When a ticket, task, or feature introduces new types of concerns, the compliance
 
 ### Detection Rules
 
-The Agency Director or the reviewing agent must check whether the work introduces any of the following concern categories:
+The Supreme Leader or the reviewing agent must check whether the work introduces any of the following concern categories:
 
 | Concern Category | Trigger Signals | Required Skill/Check |
 |-----------------|-----------------|---------------------|
@@ -201,7 +201,7 @@ Each compliance tier has an **independent** 3-retry budget at each gate.
 | T1 (Mechanical) | 3 retries per gate | Code Architect (automated fixes) |
 | T2 (Architectural) | 3 retries per gate | Code Architect with Software Engineer input |
 | T3 (Semantic) | 3 retries per gate | Relevant specialist(s) |
-| T-ARCH (Architecture + Principles) | 3 retries per gate | Software Engineer for code; Agency Director for routing |
+| T-ARCH (Architecture + Principles) | 3 retries per gate | Software Engineer for code; Supreme Leader for routing |
 
 **Key rule:** T1, T2, T3, and T-ARCH retry counters are independent. A T1 failure does not consume the T2, T3, or T-ARCH budget. Worst case per gate: 3×T1 + 3×T2 + 3×T3 + 3×T-ARCH = 12 loops.
 
@@ -212,7 +212,7 @@ Each compliance tier has an **independent** 3-retry budget at each gate.
 | T1 | Code Architect | Fix mechanical violations |
 | T2 | Code Architect + Software Engineer | Fix architectural violations |
 | T3 | Relevant specialist(s) | Fix semantic violations |
-| T-ARCH | Software Engineer (code) or Agency Director (routing) | Fix logical/structural issues |
+| T-ARCH | Software Engineer (code) or Supreme Leader (routing) | Fix logical/structural issues |
 
 ### Escalation
 

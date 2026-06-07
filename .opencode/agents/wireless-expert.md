@@ -37,7 +37,7 @@ expected_outcomes:
   - verdict: APPROVED | CONDITIONAL PASS | REJECTED
   - findings: list of protocol discrepancies with spec references
   - routing: if rejected, who fixes (typically code-architect)
-output_to: agency-director (for verdicts) | code-architect (for implementation feedback)
+output_to: supreme-leader (for verdicts) | code-architect (for implementation feedback)
 ```
 
 ## Phase A — Requirements & Design

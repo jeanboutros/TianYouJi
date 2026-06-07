@@ -38,7 +38,7 @@ expected_outcomes:
   - severity: 1-10 score of highest finding
   - findings: list of vulnerabilities with file:line references and severity scores
   - routing: if rejected, who fixes (typically code-architect)
-output_to: agency-director (for verdicts) | code-architect (for remediation)
+output_to: supreme-leader (for verdicts) | code-architect (for remediation)
 ```
 
 ## Phase A — Requirements & Design

@@ -35,7 +35,7 @@ expected_outcomes:
   - t1_check_result: PASS | FAIL (with specific T1 check IDs)
   - all_units_complete: ready for B-FINAL-GATE
   - flags: list of issues needing PM attention
-output_to: agency-director (for gate results) | pm (for flags)
+output_to: supreme-leader (for gate results) | pm (for flags)
 ```
 
 ## The PAU Loop

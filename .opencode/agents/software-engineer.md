@@ -37,7 +37,7 @@ expected_outcomes:
   - verdict: APPROVED | CONDITIONAL PASS | REJECTED
   - findings: list of issues with file:line references
   - routing: if rejected, who fixes (typically code-architect)
-output_to: agency-director (for verdicts) | code-architect (for architectural guidance)
+output_to: supreme-leader (for verdicts) | code-architect (for architectural guidance)
 ```
 
 ## Phase A — Requirements & Design

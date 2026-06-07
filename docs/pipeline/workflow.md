@@ -54,7 +54,7 @@ The pipeline has three sequential phases. Each must complete before the next beg
    - Test Engineer → testability, edge cases, static_assert feasibility
    - Docs Writer → Doxygen coverage, learning docs, references
 
-3. **A2 — Dual-Model Challenge:** Two independent AI model passes review the architecture. The "primary" produces the design; the "challenger" tries to break it — finding contradictions, missed edge cases, and unsupported assumptions. The Agency Director synthesizes the best from both passes.
+3. **A2 — Dual-Model Challenge:** Two independent AI model passes review the architecture. The "primary" produces the design; the "challenger" tries to break it — finding contradictions, missed edge cases, and unsupported assumptions. The Supreme Leader synthesizes the best from both passes.
 
 4. **A3 — A-GATE:** All six specialists must issue APPROVED or CONDITIONAL PASS. Any REJECTED triggers a loop back to A1 with specific critique (up to 3 retries).
 
@@ -249,7 +249,7 @@ Compliance checks are organized into four tiers, each with increasing scope and 
 
 **What:** Structural and logical correctness of **every agent output** — not just code, but also documentation, reviews, and routing decisions.
 
-**Who runs it:** Software Engineer (for code and design); Agency Director (for routing)
+**Who runs it:** Software Engineer (for code and design); Supreme Leader (for routing)
 
 **Checks:**
 
@@ -284,11 +284,11 @@ Each compliance tier has an **independent** 3-retry budget at each gate. This me
 | T1 (Mechanical) | Code Architect | Fix build errors, add Doxygen, remove banned patterns, add typed overloads |
 | T2 (Architectural) | Code Architect + Software Engineer input | Fix boundary violations, namespace issues, API surface, globals |
 | T3 (Semantic) | Relevant specialist(s) | Fix datasheet errors, protocol bugs, security holes, test gaps, doc gaps |
-| T-ARCH (Principles) | Software Engineer or Agency Director | Fix logical contradictions, structural gaps, principle violations |
+| T-ARCH (Principles) | Software Engineer or Supreme Leader | Fix logical contradictions, structural gaps, principle violations |
 
 ### What Happens When Retries Are Exhausted
 
-After 3 loops at the same tier at the same gate, the Agency Director **escalates to the human user** with:
+After 3 loops at the same tier at the same gate, the Supreme Leader **escalates to the human user** with:
 
 1. **Full violation log** — what failed, which check, which tier
 2. **Number of retry attempts** — how many times it was tried
@@ -491,7 +491,7 @@ Remove lines 132-134 from main.cpp to prevent MOSI direction override.
 
 | Blocking? | Route | Effect |
 |-----------|-------|--------|
-| Yes | Agency Director pauses pipeline | Presented to user immediately |
+| Yes | Supreme Leader pauses pipeline | Presented to user immediately |
 | No | Queued for PM | PM creates task in next planning cycle |
 | Advisory | Logged | Persisted for future reference |
 
@@ -501,7 +501,7 @@ Remove lines 132-134 from main.cpp to prevent MOSI direction override.
 
 ### How Agents Are Dispatched
 
-The Agency Director dispatches agents using a **structured envelope** that preserves context across handoffs. Every dispatch carries:
+The Supreme Leader dispatches agents using a **structured envelope** that preserves context across handoffs. Every dispatch carries:
 
 ```yaml
 ticket: "nrf-0016"                    # Which task this is for
@@ -567,7 +567,7 @@ C3 (C-GATE: T1 + T3 + T-ARCH)
 COMMIT (git commit with conventional commit message)
 ```
 
-**At any point:** If any tier exhausts its 3-retry budget, the Agency Director escalates to the user with a full violation report.
+**At any point:** If any tier exhausts its 3-retry budget, the Supreme Leader escalates to the user with a full violation report.
 
 ### Agent Routing Table
 
@@ -584,7 +584,7 @@ COMMIT (git commit with conventional commit message)
 | T2 architectural review | Software Engineer | compliance-gate, type-design-review |
 | T3 semantic review | All 6 specialists | compliance-gate, domain-specific skills |
 | T-ARCH review | Software Engineer | compliance-gate, type-design-review |
-| Gate orchestration | Agency Director | pipeline, compliance-gate, flag-protocol |
+| Gate orchestration | Supreme Leader | pipeline, compliance-gate, flag-protocol |
 | Task creation | PM | pipeline, flag-protocol |
 | Debugging | Code Architect | systematic-debugging, nrf24l01plus |
 
@@ -705,7 +705,7 @@ Here's the complete pipeline in one view:
                               └──────────┘
 ```
 
-**At any tier exhaustion (3 retries):** Agency Director escalates to the human user.
+**At any tier exhaustion (3 retries):** Supreme Leader escalates to the human user.
 
 **Self-reflection after any violation:** Why was it missed? What safeguard would catch it? Update the knowledge base.
 
