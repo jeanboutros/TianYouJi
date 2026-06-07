@@ -54,10 +54,16 @@ This project uses a 3-phase validation pipeline for all non-trivial changes.
 ### Pipeline Summary
 
 ```
-Phase A: REQUIREMENTS & DESIGN  →  Phase B: BUILD (PAU Loop)  →  Phase C: MULTI-AGENT VERIFY
-   (All specialists review)          (Code Architect)              (All specialists approve)
-   (Dual-Model Challenge)                                          (Dual-Model Challenge)
+Phase A ──▶ A-GATE (T3) ──▶ Phase B ──▶ B-UNIT-GATE (T1) ×N ──▶ B-FINAL-GATE (T1+T2) ──▶ Phase C ──▶ C-GATE (T1+T3) ──▶ COMMIT
 ```
+
+Each gate has independent 3-retry counters per tier.
+Gates enforce three compliance tiers:
+  T1 (Mechanical): build, Doxygen, banned patterns, file placement, reserved bits
+  T2 (Architectural): library boundary, namespaces, typed API, no globals
+  T3 (Semantic): datasheet fidelity, protocol correctness, security, coverage
+
+See `docs/pipeline/pipeline.md` for full gate definitions and `docs/pipeline/scripts/t1-check.sh` for automated T1 checks.
 
 ### Key Rules
 
@@ -67,6 +73,12 @@ Phase A: REQUIREMENTS & DESIGN  →  Phase B: BUILD (PAU Loop)  →  Phase C: MU
 4. **Quality Gate** — Before committing: build passes, Doxygen present, typed enums used, no magic numbers, AGENTS.md rules followed.
 5. **Incremental execution** — One logical unit → build → pass → next unit. Never skip validation.
 6. **Flag Protocol** — Non-blocking issues raised as structured flags for the PM to process.
+7. **Compliance Gates** — Every phase transition passes through a gate with tiered checks:
+   - B-UNIT-GATE (T1): after every implementation unit, run `scripts/t1-check.sh`
+   - B-FINAL-GATE (T1+T2): after all units, run T1 + Software Engineer spot-check
+   - C-GATE (T1+T3): before commit, re-run T1 + all 6 specialists approve
+   - Independent 3-retry budget per tier per gate; escalate to user if exhausted
+   - Self-reflection on violations: why was it missed? What safeguard prevents recurrence?
 
 ### Validation Command
 
@@ -75,6 +87,19 @@ source ~/.espressif/tools/activate_idf_v6.0.1.sh && idf.py build
 ```
 
 Must exit 0 with zero warnings (`-Werror` is active) before any commit.
+
+```bash
+# T1 Mechanical Compliance Check (run between PAU units and at gates):
+bash docs/pipeline/scripts/t1-check.sh
+```
+
+## Compliance Tiers
+
+| Tier | Name | Enforced at | What | How | Who |
+|------|------|-------------|------|-----|-----|
+| T1 | Mechanical | B-UNIT-GATE, B-FINAL-GATE, C-GATE | Build, Doxygen, banned patterns, file placement, raw integers, magic numbers | `scripts/t1-check.sh` + build | Code Architect runs, Director orchestrates |
+| T2 | Architectural | B-FINAL-GATE | Library boundary, namespaces, typed API, file placement, no globals | Delta review | Software Engineer |
+| T3 | Semantic | A-GATE, C-GATE | Datasheet, protocol, security, coverage, docs | Full specialist review | All 6 specialists |
 
 ## Code Documentation Rules (MANDATORY)
 
@@ -443,10 +468,6 @@ The project now uses `nrf24::diag::full_boot_diagnostic()` (in `diag_boot.h`) in
 
 The old `verify_spi_comm()` and `verify_ble_rx()` functions are still available as backward-compatible wrappers but are marked `@deprecated` in favor of `full_boot_diagnostic()`.
 
-### Resolved: Hal::spi_xfer() now returns bool (was F-1)
+### Hal::spi_xfer() returns bool
 
-Previously, `EspIdfHal::spi_xfer()` used `ESP_ERROR_CHECK()` on `spi_device_polling_transmit()`, which called `abort()` on any SPI transfer failure. This defeated the diagnostic retry architecture.
-
-**Fix applied:** `Hal::spi_xfer()` now returns `bool` (true = success, false = failure). `EspIdfHal::spi_xfer()` returns `false` on SPI errors instead of calling `abort()`. All `Driver` methods propagate the error: `read_reg(uint8_t)` returns `0xFF` on failure, `write_reg()`/`write_reg_multi()`/`read_reg_multi()`/`read_payload()`/`flush_rx()`/`flush_tx()` return `bool`. The typed template overloads (`read_reg<T>()`, `write_reg<T>()`) retain their original void/T return types for API stability.
-
-`EspIdfHal` also now has an RAII destructor that removes the SPI device and frees the SPI bus when `init()` was called (was F-4).
+`EspIdfHal::spi_xfer()` returns `false` on SPI errors instead of calling `abort()`. All `Driver` methods propagate the error: `read_reg(uint8_t)` returns `0xFF` on failure, `write_reg()`/`write_reg_multi()`/`read_reg_multi()`/`read_payload()`/`flush_rx()`/`flush_tx()` return `bool`. The typed template overloads (`read_reg<T>()`, `write_reg<T>()`) retain their original void/T return types for API stability. `EspIdfHal` has an RAII destructor that removes the SPI device and frees the bus.

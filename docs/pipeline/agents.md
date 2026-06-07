@@ -24,6 +24,21 @@ The Dual-Model Challenge is used in both phases for adversarial review.
 - Track pipeline state (which phase, which unit)
 - Manage Dual-Model Challenge: invoke both passes, synthesize, present conflicts to user
 
+**Gate orchestration responsibilities:**
+
+The Agency Director is responsible for orchestrating the tiered compliance gates throughout the pipeline. This is an explicit coordination duty — the Director does not perform checks itself, but ensures the right agent runs the right tier at the right time.
+
+- **Between PAU units (B-UNIT-GATE):** Orchestrate T1 check by routing to Code Architect. If T1 violations are found, route back to Code Architect for fixing. Track T1 retry counter (max 3).
+- **At B-FINAL-GATE:** Orchestrate T1 then T2 checks in sequence. First T1 (Code Architect), then T2 (Software Engineer). If T1 fails, do not proceed to T2. Track independent retry counters for each tier.
+- **At C-GATE:** Orchestrate T1 re-run (Code Architect), then T3 specialist review (all six specialists). If T1 fails, do not proceed to T3. Track independent retry counters.
+- **Loop counter management:** Each tier has an independent retry budget of 3. T1 retries do not consume T2 or T3 budget, and vice versa. Track per-tier counters separately.
+- **Escalation:** When any tier exhausts its retry budget (3 retries), escalate to the user with a violation report containing file:line references and rule identifiers.
+- **Violation reports:** Generate structured violation reports for each failed check, including:
+  - File and line number
+  - Tier and rule reference (e.g. T1.3, T2.4)
+  - Description of the violation
+  - Suggested fix
+
 ---
 
 ## 2. Software Engineer
@@ -41,8 +56,21 @@ The Dual-Model Challenge is used in both phases for adversarial review.
 - Ensure no platform coupling in library headers
 - Define acceptance criteria for software architecture
 - **API Surface Audit:** list every public method signature and verify that each parameter type is maximally restrictive — no `uint8_t` where a typed enum/struct vocabulary exists
+- **T2 acceptance criteria definition:** Define the T2 architectural acceptance criteria that will be checked at B-FINAL-GATE and Phase C:
+  - Library/platform boundary delineation (what lives where)
+  - Namespace structure requirements (nrf24::, nrf24::ble::, nrf24::diag::, nrf24::reg::)
+  - File placement rules (constants in library, FreeRTOS tasks separate, HAL in adapter)
+  - API surface maximal-typing policy
+  - No mutable global state in library code
 
-**Phase C verification checklist:**
+**Phase C / B-FINAL-GATE T2 verification checklist:**
+- [ ] T2.1: Library has zero platform includes in public headers
+- [ ] T2.2: Namespace hierarchy clean (nrf24::, nrf24::ble::, nrf24::diag::, nrf24::reg::)
+- [ ] T2.3: File placement correct (constants in library, tasks separate, HAL in adapter)
+- [ ] T2.4: API surface: every public parameter is maximally restrictive type
+- [ ] T2.5: No mutable global state in library code
+
+**Phase C verification checklist (full):**
 - [ ] Library has zero platform includes in public headers
 - [ ] HAL interface sufficient for all driver operations
 - [ ] Namespace hierarchy clean (nrf24::, nrf24::ble::, nrf24::diag::)
@@ -206,6 +234,19 @@ The Dual-Model Challenge is used in both phases for adversarial review.
 - Follow AGENTS.md coding standards (Doxygen, typed enums, no raw hex)
 - Raise flags for architectural ambiguity
 
+**T1 compliance enforcement duties:**
+
+The Code Architect is explicitly responsible for mechanical compliance checks at the unit and final gates of Phase B. These checks are the first line of defense — catching what should have been caught during implementation before the code reaches specialist review.
+
+- **After every implementation unit (B-UNIT-GATE):** Run T1 checks on the unit's output. Fix any violations before declaring the unit complete.
+- **At B-FINAL-GATE:** Run T1 checks across all units combined. Fix any violations found.
+- **Fix violations:** When T1 catches a violation (missing Doxygen, banned patterns, raw integers, etc.), fix it immediately in the code.
+- **Self-reflection:** When T1 catches a violation, ask:
+  1. Why wasn't this caught during implementation?
+  2. What procedural safeguard would have caught it earlier?
+  3. Does the skill/pipeline need updating to prevent recurrence?
+- **Maximum 3 retries per T1 check:** If the same T1 check fails 3 times in a row, escalate to the Agency Director for routing to the user.
+
 **Constraints:**
 - NEVER implement entire task at once
 - NEVER skip build validation between units
@@ -251,7 +292,7 @@ Used in **Phase A** (architecture) and **Phase C** (verification).
 ### When to invoke
 
 | Scenario | Use Dual-Model? |
-|----------|----------------|
+|----------|-----------------|
 | New register implementation | Yes |
 | New protocol feature (whitening, CRC, etc.) | Yes |
 | HAL interface change | Yes |
@@ -307,3 +348,66 @@ flowchart TD
     
     CA --> |FLAG| PM[PM]
 ```
+
+---
+
+## Compliance Tiers
+
+The pipeline uses three tiers of compliance checks, each with increasing scope and specialist involvement. Tiers are run sequentially at each gate — a lower tier must pass before the next tier runs. Each tier has an independent retry budget of 3.
+
+### Tier 1 — Mechanical (Code Architect)
+
+Mechanical checks that can be verified without deep specialist knowledge. Run by the Code Architect at every B-UNIT-GATE and at B-FINAL-GATE.
+
+| ID | Check | Description |
+|----|-------|-------------|
+| T1.1 | Build passes | `idf.py build` exits 0, zero warnings (`-Werror` active) |
+| T1.2 | Doxygen present | Every new public function/struct/enum/macro has `/** @brief */` |
+| T1.3 | No raw integers in public API | All register fields, addresses, and method parameters use typed enums or named constants — no magic numbers |
+| T1.4 | No banned patterns | No `uint8_t` public parameters where a typed vocabulary exists; raw overloads must be `private` |
+| T1.5 | Reserved bits handled | All reserved bits in register structs are accounted for in `to_byte()`/`from_byte()` |
+| T1.6 | AGENTS.md compliance | All coding rules in AGENTS.md followed (commit format, naming, etc.) |
+| T1.7 | `@code` examples use vocabulary | No magic numbers in Doxygen `@code` blocks |
+
+### Tier 2 — Architectural (Software Engineer)
+
+Architectural and structural checks that require understanding of component boundaries and API design. Run by the Software Engineer at B-FINAL-GATE.
+
+| ID | Check | Description |
+|----|-------|-------------|
+| T2.1 | Zero platform includes | Library public headers include ONLY `<cstdint>`, `<cstring>`, and own headers — no platform SDK headers |
+| T2.2 | Namespace hygiene | Clean hierarchy: `nrf24::` for core, `nrf24::ble::` for BLE, `nrf24::diag::` for diagnostics, `nrf24::reg::` for register addresses |
+| T2.3 | File placement | Constants and types in library component, FreeRTOS tasks in application, HAL implementations in platform adapter |
+| T2.4 | Maximal typing policy | Every public method parameter uses the most restrictive type available — no `uint8_t` where `enum class` or struct vocabulary exists |
+| T2.5 | No mutable globals | Library code has no mutable global state; all state is instance-scoped or const |
+
+### Tier 3 — Specialist (All six agents)
+
+Deep specialist review covering domain correctness. Run by all six specialist agents at C-GATE.
+
+| ID | Check | Responsible Agent | Description |
+|----|-------|-------------------|-------------|
+| T3.1 | Datasheet fidelity | Hardware Engineer | Every register field matches the nRF24L01+ datasheet exactly — names, bit positions, encodings |
+| T3.2 | BLE protocol correctness | Wireless Expert | Channel mapping, whitening, access address, CRC, PDU format all correct per BLE spec |
+| T3.3 | Buffer safety | Security Reviewer | No overflows, stack depth adequate, no secrets, input validated at boundaries |
+| T3.4 | Test coverage | Test Engineer | static_assert round-trips, edge cases, host-side unit tests, all acceptance criteria covered |
+| T3.5 | Documentation completeness | Docs Writer | All symbols have Doxygen, learning docs updated, references verified |
+| T3.6 | Architectural integrity | Software Engineer | SOLID, HAL decoupling, no raw integers, CMake dependencies correct |
+
+### Gate sequence
+
+```
+B-UNIT-GATE:     T1 only (Code Architect)
+B-FINAL-GATE:    T1 → T2 (sequential; T2 only runs if T1 passes)
+C-GATE:          T1 → T3 (sequential; T3 only runs if T1 passes; T2 findings are included in T3.6)
+```
+
+### Retry budgets
+
+| Tier | Retries | Who runs it | Who fixes violations |
+|------|---------|-------------|---------------------|
+| T1   | 3       | Code Architect | Code Architect |
+| T2   | 3       | Software Engineer | Routed back to Code Architect |
+| T3   | 3       | All six specialists | Routed back to Code Architect |
+
+If any tier exhausts its 3-retry budget, the Agency Director escalates to the user with a full violation report.
